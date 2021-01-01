@@ -348,6 +348,10 @@ void pybind_core_tensor(py::module& m) {
         return t;
     });
 
+    // Numpy IO.
+    tensor.def("save", &Tensor::Save);
+    tensor.def_static("load", &Tensor::Load);
+
     /// Linalg operations.
     tensor.def("matmul", &Tensor::Matmul);
     tensor.def("__matmul__", &Tensor::Matmul);
