@@ -20,7 +20,7 @@ set(KERNEL_CUDA_SRC
     kernel/UnaryEWCUDA.cu
     kernel/BinaryEWCUDA.cu
     kernel/GeneralEWCUDA.cu
-    kernel/ReductionCUDA.cu    
+    kernel/ReductionCUDA.cu
 )
 
 set(LINALG_SRC
@@ -54,6 +54,7 @@ set(CORE_SRC
     Indexer.cpp
     MemoryManager.cpp
     MemoryManagerCPU.cpp
+    NumpyIO.cpp
     Tensor.cpp
     TensorKey.cpp
     TensorList.cpp
