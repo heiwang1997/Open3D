@@ -27,6 +27,7 @@
 import open3d as o3d
 import numpy as np
 import pytest
+import tempfile
 
 import sys
 import os
@@ -1010,3 +1011,20 @@ def test_item(device):
                                 device=device)
     assert o3_t[0, 0].item() == True
     assert isinstance(o3_t[0, 0].item(), bool)
+
+
+@pytest.mark.parametrize("device", list_devices())
+def test_save_load(device):
+    # TODO:
+    # o3d -> numpy
+    # numpy -> o3d (test unsupported dtypes, raggeed tensor, ...)
+    with tempfile.TemporaryDirectory() as temp_dir:
+        file_name = f"{temp_dir}/tensor.npy"
+        o3_t = o3d.core.Tensor([[1, 2], [3, 4]],
+                               dtype=o3d.core.Dtype.Float32,
+                               device=device)
+        o3_t.save(file_name)
+        np_t_load = np.load(file_name)
+        o3_t_load = o3d.core.Tensor.load(file_name)
+        np.testing.assert_equal(o3_t.cpu().numpy(), np_t_load)
+        np.testing.assert_equal(o3_t_load.cpu().numpy(), np_t_load)
