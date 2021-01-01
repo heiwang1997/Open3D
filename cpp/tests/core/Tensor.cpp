@@ -2636,5 +2636,10 @@ TEST_P(TensorPermuteDevices, IsSame) {
     EXPECT_TRUE(vec[0].IsSame(vec[1]));
 }
 
+TEST_P(TensorPermuteDevices, NumpyIO) {
+    // core::Device device = GetParam();
+    EXPECT_TRUE(false);
+}
+
 }  // namespace tests
 }  // namespace open3d
