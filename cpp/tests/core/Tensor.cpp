@@ -34,6 +34,7 @@
 #include "open3d/core/MemoryManager.h"
 #include "open3d/core/SizeVector.h"
 #include "open3d/core/kernel/Kernel.h"
+#include "open3d/utility/FileSystem.h"
 #include "open3d/utility/Helper.h"
 #include "tests/UnitTest.h"
 #include "tests/core/CoreTest.h"
@@ -2637,8 +2638,15 @@ TEST_P(TensorPermuteDevices, IsSame) {
 }
 
 TEST_P(TensorPermuteDevices, NumpyIO) {
-    // core::Device device = GetParam();
-    EXPECT_TRUE(false);
+    const core::Device device = GetParam();
+    const std::string file_name = "tensor.npy";
+
+    core::Tensor t = core::Tensor::Init<float>({{1, 2}, {3, 4}}, device);
+    t.Save(file_name);
+    core::Tensor t_load = core::Tensor::Load(file_name);
+
+    EXPECT_TRUE(t.AllClose(t_load));
+    utility::filesystem::RemoveFile(file_name);
 }
 
 }  // namespace tests

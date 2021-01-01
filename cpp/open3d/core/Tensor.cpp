@@ -1214,6 +1214,14 @@ Tensor Tensor::FromDLPack(const DLManagedTensor* src) {
                   dtype, blob);
 }
 
+void Tensor::Save(const std::string& file_name) const {
+    utility::LogError("Unimplemented save.");
+}
+
+Tensor Tensor::Load(const std::string& file_name) {
+    utility::LogError("Unimplemented load.");
+}
+
 bool Tensor::AllClose(const Tensor& other, double rtol, double atol) const {
     // TODO: support nan;
     return IsClose(other, rtol, atol).All();

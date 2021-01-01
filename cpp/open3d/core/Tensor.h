@@ -1115,6 +1115,12 @@ public:
     /// Convert DLManagedTensor to Tensor.
     static Tensor FromDLPack(const DLManagedTensor* dlmt);
 
+    /// Save tensor to numpy's npy format.
+    void Save(const std::string& file_name) const;
+
+    /// Load tensor from numpy's npy format.
+    static Tensor Load(const std::string& file_name);
+
     /// Assert that the Tensor has the specified shape.
     void AssertShape(const SizeVector& expected_shape) const;
 
