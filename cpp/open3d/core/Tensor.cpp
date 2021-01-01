@@ -1215,7 +1215,17 @@ Tensor Tensor::FromDLPack(const DLManagedTensor* src) {
 }
 
 void Tensor::Save(const std::string& file_name) const {
-    utility::LogError("Unimplemented save.");
+    Tensor t_contiguous = this->Contiguous();
+    if (t_contiguous.GetDevice().GetType() != Device::DeviceType::CPU) {
+        // TODO: Improve Tensor::To to make this more convenient.
+        t_contiguous = t_contiguous.Copy(Device("CPU:0"));
+    }
+    std::vector<size_t> shape(shape_.begin(), shape_.end());
+    DISPATCH_DTYPE_TO_TEMPLATE_WITH_BOOL(dtype_, [&]() {
+        npy_save(file_name,
+                 static_cast<const scalar_t*>(t_contiguous.GetDataPtr()),
+                 shape);
+    });
 }
 
 Tensor Tensor::Load(const std::string& file_name) {
