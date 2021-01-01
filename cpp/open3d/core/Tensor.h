@@ -230,7 +230,7 @@ public:
         return Tensor(ele_list, shape, type, device);
     };
 
-    /// Create a 1-D tensor with initilizer list.
+    /// Create a 1-D tensor with initializer list.
     /// For example,
     /// core::Tensor::Init<float>({1,2,3});
     template <typename T>
@@ -244,7 +244,7 @@ public:
         return Tensor(ele_list, shape, type, device);
     };
 
-    /// Create a 2-D tensor with nested initilizer list.
+    /// Create a 2-D tensor with nested initializer list.
     /// For example,
     /// core::Tensor::Init<float>({{1,2,3},{4,5,6}});
     template <typename T>
@@ -272,7 +272,7 @@ public:
         return Tensor(ele_list, shape, type, device);
     };
 
-    /// Create a 3-D tensor with nested initilizer list.
+    /// Create a 3-D tensor with nested initializer list.
     /// For example,
     /// core::Tensor::Init<float>({{{1,2,3},{4,5,6}},{{7,8,9},{10,11,12}}});
     template <typename T>
