@@ -92,6 +92,16 @@ inline std::vector<char>& operator+=(std::vector<char>& lhs, const T rhs) {
     return lhs;
 }
 
+template <typename T>
+inline std::string ToByteString(const T& rhs) {
+    std::stringstream ss;
+    for (size_t byte = 0; byte < sizeof(T); byte++) {
+        char val = *((char*)&rhs + byte);
+        ss << val;
+    }
+    return ss.str();
+}
+
 template <>
 inline std::vector<char>& operator+=(std::vector<char>& lhs,
                                      const std::string rhs) {
