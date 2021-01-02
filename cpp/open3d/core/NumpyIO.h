@@ -56,15 +56,16 @@ public:
           type_(type),
           word_size_(word_size),
           fortran_order_(fortran_order) {
-        num_vals_ = 1;
+        num_elements_ = 1;
         for (size_t i = 0; i < shape_.size(); i++) {
-            num_vals_ *= shape_[i];
+            num_elements_ *= shape_[i];
         }
         data_holder =
-                std::make_shared<std::vector<char>>(num_vals_ * word_size_);
+                std::make_shared<std::vector<char>>(num_elements_ * word_size_);
     }
 
-    NpyArray() : shape_(0), word_size_(0), fortran_order_(0), num_vals_(0) {}
+    NpyArray()
+        : shape_(0), word_size_(0), fortran_order_(0), num_elements_(0) {}
 
     template <typename T>
     T* GetDataPtr() {
@@ -75,8 +76,6 @@ public:
     const T* GetDataPtr() const {
         return reinterpret_cast<T*>(&(*data_holder)[0]);
     }
-
-    size_t NumBytes() const { return data_holder->size(); }
 
     Dtype GetDtype() const {
         Dtype dtype(Dtype::DtypeCode::Undefined, 1, "undefined");
@@ -108,13 +107,15 @@ public:
 
     bool GetFortranOrder() const { return fortran_order_; }
 
+    size_t NumBytes() const { return data_holder->size(); }
+
 private:
     std::shared_ptr<std::vector<char>> data_holder;
     std::vector<size_t> shape_;
     char type_;
     size_t word_size_;
     bool fortran_order_;
-    size_t num_vals_;
+    size_t num_elements_;
 };
 
 char BigEndianTest();
