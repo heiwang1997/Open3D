@@ -180,6 +180,10 @@ inline std::vector<char> CreateNpyHeaderV2(const std::vector<size_t>& shape) {
 
 template <typename T>
 inline std::vector<char> CreateNpyHeader(const std::vector<size_t>& shape) {
+    if (shape.size() == 0) {
+        return CreateNpyHeaderV2<T>(shape);
+    }
+
     std::vector<char> dict;
     dict += "{'descr': '";
     dict += BigEndianChar();
