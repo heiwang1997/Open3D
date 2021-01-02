@@ -45,6 +45,7 @@
 #include <typeinfo>
 #include <vector>
 
+#include "open3d/core/Blob.h"
 #include "open3d/core/Dispatch.h"
 #include "open3d/core/Dtype.h"
 #include "open3d/core/SizeVector.h"
