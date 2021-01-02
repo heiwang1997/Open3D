@@ -55,7 +55,9 @@ struct NpyArray {
           word_size(_word_size),
           fortran_order(_fortran_order) {
         num_vals = 1;
-        for (size_t i = 0; i < shape.size(); i++) num_vals *= shape[i];
+        for (size_t i = 0; i < shape.size(); i++) {
+            num_vals *= shape[i];
+        }
         data_holder = std::make_shared<std::vector<char>>(num_vals * word_size);
     }
 
