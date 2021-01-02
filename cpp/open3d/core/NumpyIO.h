@@ -193,6 +193,9 @@ public:
     int64_t NumBytes() const { return num_elements_ * word_size_; }
 
     Tensor ToTensor() const {
+        if (fortran_order_) {
+            utility::LogError("ToTensor failed due to fortran_order.");
+        }
         Tensor t;
         DISPATCH_DTYPE_TO_TEMPLATE_WITH_BOOL(GetDtype(), [&]() {
             t = Tensor(GetDataPtr<scalar_t>(), GetShape(), GetDtype());
