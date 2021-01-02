@@ -1233,7 +1233,13 @@ Tensor Tensor::Load(const std::string& file_name) {
     utility::LogInfo("type: {}", np_array.type_);
     utility::LogInfo("word_size: {}", np_array.word_size);
     (void)np_array;
-    utility::LogError("Load unimplemented");
+
+    SizeVector shape(np_array.shape.begin(), np_array.shape.end());
+    Tensor t;
+    DISPATCH_DTYPE_TO_TEMPLATE_WITH_BOOL(np_array.GetDtype(), [&]() {
+        t = Tensor(np_array.data<scalar_t>(), shape, np_array.GetDtype());
+    });
+    return t;
 }
 
 bool Tensor::AllClose(const Tensor& other, double rtol, double atol) const {
