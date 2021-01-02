@@ -46,6 +46,16 @@
 namespace open3d {
 namespace core {
 
+char BigEndianTest();
+char MapType(const std::type_info& t);
+template <typename T>
+std::vector<char> CreateNpyHeader(const std::vector<size_t>& shape);
+void ParseNpyHeader(FILE* fp,
+                    char& type,
+                    size_t& word_size,
+                    std::vector<size_t>& shape,
+                    bool& fortran_order);
+
 class NpyArray {
 public:
     NpyArray(const std::vector<size_t>& shape,
@@ -109,7 +119,31 @@ public:
 
     size_t NumBytes() const { return data_holder->size(); }
 
+    static NpyArray Load(const std::string& file_name) {
+        FILE* fp = fopen(file_name.c_str(), "rb");
+        if (!fp) {
+            utility::LogError("NpyLoad: Unable to open file {}.", file_name);
+        }
+        NpyArray arr = LoadTheNpyFile(fp);
+        fclose(fp);
+        return arr;
+    }
+
 private:
+    static NpyArray LoadTheNpyFile(FILE* fp) {
+        std::vector<size_t> shape;
+        size_t word_size;
+        bool fortran_order;
+        char type;
+        ParseNpyHeader(fp, type, word_size, shape, fortran_order);
+        NpyArray arr(shape, type, word_size, fortran_order);
+        size_t nread = fread(arr.GetDataPtr<char>(), 1, arr.NumBytes(), fp);
+        if (nread != arr.NumBytes()) {
+            utility::LogError("LoadTheNpyFile: failed fread");
+        }
+        return arr;
+    }
+
     std::shared_ptr<std::vector<char>> data_holder;
     std::vector<size_t> shape_;
     char type_;
@@ -117,17 +151,6 @@ private:
     bool fortran_order_;
     size_t num_elements_;
 };
-
-char BigEndianTest();
-char MapType(const std::type_info& t);
-template <typename T>
-std::vector<char> CreateNpyHeader(const std::vector<size_t>& shape);
-void ParseNpyHeader(FILE* fp,
-                    char& type,
-                    size_t& word_size,
-                    std::vector<size_t>& shape,
-                    bool& fortran_order);
-NpyArray NpyLoad(std::string fname);
 
 template <typename T>
 std::vector<char>& operator+=(std::vector<char>& lhs, const T rhs) {

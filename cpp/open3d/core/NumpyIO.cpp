@@ -156,34 +156,5 @@ void ParseNpyHeader(FILE *fp,
     word_size = atoi(str_ws.substr(0, loc2).c_str());
 }
 
-NpyArray load_the_npy_file(FILE *fp) {
-    std::vector<size_t> shape;
-    size_t word_size;
-    bool fortran_order;
-    char type;
-    ParseNpyHeader(fp, type, word_size, shape, fortran_order);
-
-    NpyArray arr(shape, type, word_size, fortran_order);
-    size_t nread = fread(arr.GetDataPtr<char>(), 1, arr.NumBytes(), fp);
-    if (nread != arr.NumBytes()) {
-        utility::LogError("load_the_npy_file: failed fread");
-    }
-
-    return arr;
-}
-
-NpyArray NpyLoad(std::string fname) {
-    FILE *fp = fopen(fname.c_str(), "rb");
-
-    if (!fp) {
-        utility::LogError("NpyLoad: Unable to open file {}.", fname);
-    }
-
-    NpyArray arr = load_the_npy_file(fp);
-
-    fclose(fp);
-    return arr;
-}
-
 }  // namespace core
 }  // namespace open3d
