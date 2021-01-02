@@ -1220,8 +1220,8 @@ void Tensor::Save(const std::string& file_name) const {
         // TODO: Improve Tensor::To to make this more convenient.
         t_contiguous = t_contiguous.Copy(Device("CPU:0"));
     }
-    std::vector<size_t> shape(shape_.begin(), shape_.end());
-    NumpySave(file_name, t_contiguous.GetDataPtr(), shape, dtype_);
+    NumpySave(file_name, t_contiguous.GetDataPtr(), t_contiguous.GetShape(),
+              t_contiguous.GetDtype());
 }
 
 Tensor Tensor::Load(const std::string& file_name) {

@@ -88,7 +88,7 @@ inline std::string ToByteString(const T& rhs) {
     return ss.str();
 }
 
-inline std::vector<char> CreateNumpyHeader(const std::vector<size_t>& shape,
+inline std::vector<char> CreateNumpyHeader(const SizeVector& shape,
                                            const Dtype& dtype) {
     // {}     -> "()"
     // {1}    -> "(1,)"
@@ -308,7 +308,7 @@ private:
 
 inline void NumpySave(std::string fname,
                       const void* data,
-                      const std::vector<size_t>& shape,
+                      const SizeVector& shape,
                       const Dtype& dtype) {
     FILE* fp = fopen(fname.c_str(), "wb");
     std::vector<char> header = CreateNumpyHeader(shape, dtype);
