@@ -83,6 +83,15 @@ inline char TypeToChar(const std::type_info& t) {
 }
 
 inline char DtypeToChar(const Dtype& dtype) {
+    // Not all dtypes are supported.
+    // 'f': float, double, long double
+    // 'i': int, char, short, long, long long
+    // 'u': unsigned char, unsigned short, unsigned long, unsigned long long,
+    //      unsigned int
+    // 'b': bool
+    // 'c': std::complex<float>, std::complex<double>),
+    //      std::complex<long double>)
+    // '?': object
     if (dtype == Dtype::Float32) return 'f';
     if (dtype == Dtype::Float64) return 'f';
     if (dtype == Dtype::Int32) return 'i';
