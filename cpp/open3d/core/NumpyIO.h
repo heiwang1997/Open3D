@@ -40,6 +40,8 @@
 #include <typeinfo>
 #include <vector>
 
+#include "open3d/core/Dtype.h"
+
 namespace open3d {
 namespace core {
 
@@ -76,6 +78,16 @@ struct NpyArray {
     }
 
     size_t num_bytes() const { return data_holder->size(); }
+
+    Dtype GetDtype() const {
+        Dtype dtype(Dtype::DtypeCode::Undefined, 1, "undefined");
+        if (type_ == 'f') {
+        } else if (type_ == 'i') {
+        } else if (type_ == 'u') {
+        } else if (type_ == 'b') {
+        }
+        return dtype;
+    }
 
     std::shared_ptr<std::vector<char>> data_holder;
     std::vector<size_t> shape;

@@ -142,13 +142,11 @@ void parse_npy_header(FILE *fp,
     (void)littleEndian;
 
     type = header[loc1 + 1];
-    utility::LogInfo("type: {}", type);
     // assert(type == map_type(T));
 
     std::string str_ws = header.substr(loc1 + 2);
     loc2 = str_ws.find("'");
     word_size = atoi(str_ws.substr(0, loc2).c_str());
-    utility::LogInfo("word_size: {}", word_size);
 }
 
 NpyArray load_the_npy_file(FILE *fp) {

@@ -1230,6 +1230,8 @@ void Tensor::Save(const std::string& file_name) const {
 
 Tensor Tensor::Load(const std::string& file_name) {
     NpyArray np_array = npy_load(file_name);
+    utility::LogInfo("type: {}", np_array.type_);
+    utility::LogInfo("word_size: {}", np_array.word_size);
     (void)np_array;
     utility::LogError("Load unimplemented");
 }
