@@ -115,15 +115,15 @@ private:
 };
 
 char BigEndianTest();
-char map_type(const std::type_info& t);
+char MapType(const std::type_info& t);
 template <typename T>
-std::vector<char> create_npy_header(const std::vector<size_t>& shape);
-void parse_npy_header(FILE* fp,
-                      char& type,
-                      size_t& word_size,
-                      std::vector<size_t>& shape,
-                      bool& fortran_order);
-NpyArray npy_load(std::string fname);
+std::vector<char> CreateNpyHeader(const std::vector<size_t>& shape);
+void ParseNpyHeader(FILE* fp,
+                    char& type,
+                    size_t& word_size,
+                    std::vector<size_t>& shape,
+                    bool& fortran_order);
+NpyArray NpyLoad(std::string fname);
 
 template <typename T>
 std::vector<char>& operator+=(std::vector<char>& lhs, const T rhs) {
@@ -141,10 +141,10 @@ template <>
 std::vector<char>& operator+=(std::vector<char>& lhs, const char* rhs);
 
 template <typename T>
-void npy_save(std::string fname,
-              const T* data,
-              const std::vector<size_t> shape,
-              std::string mode = "w") {
+void NpySave(std::string fname,
+             const T* data,
+             const std::vector<size_t> shape,
+             std::string mode = "w") {
     FILE* fp = NULL;
     std::vector<size_t>
             true_data_shape;  // if appending, the shape of existing + new data
@@ -157,16 +157,16 @@ void npy_save(std::string fname,
         size_t word_size;
         bool fortran_order;
         char type;  // TODO: check type consistency.
-        parse_npy_header(fp, type, word_size, true_data_shape, fortran_order);
+        ParseNpyHeader(fp, type, word_size, true_data_shape, fortran_order);
         assert(!fortran_order);
         if (word_size != sizeof(T)) {
             std::cout << "libnpy error: " << fname << " has word size "
-                      << word_size << " but npy_save appending data sized "
+                      << word_size << " but NpySave appending data sized "
                       << sizeof(T) << "\n";
             assert(word_size == sizeof(T));
         }
         if (true_data_shape.size() != shape.size()) {
-            std::cout << "libnpy error: npy_save attempting to append "
+            std::cout << "libnpy error: NpySave attempting to append "
                          "misdimensioned data to "
                       << fname << "\n";
             assert(true_data_shape.size() != shape.size());
@@ -174,7 +174,7 @@ void npy_save(std::string fname,
 
         for (size_t i = 1; i < shape.size(); i++) {
             if (shape[i] != true_data_shape[i]) {
-                std::cout << "libnpy error: npy_save attempting to append "
+                std::cout << "libnpy error: NpySave attempting to append "
                              "misshaped data to "
                           << fname << "\n";
                 assert(shape[i] == true_data_shape[i]);
@@ -186,7 +186,7 @@ void npy_save(std::string fname,
         true_data_shape = shape;
     }
 
-    std::vector<char> header = create_npy_header<T>(true_data_shape);
+    std::vector<char> header = CreateNpyHeader<T>(true_data_shape);
     size_t nels = std::accumulate(shape.begin(), shape.end(), 1,
                                   std::multiplies<size_t>());
 
@@ -198,20 +198,20 @@ void npy_save(std::string fname,
 }
 
 template <typename T>
-void npy_save(std::string fname,
-              const std::vector<T> data,
-              std::string mode = "w") {
+void NpySave(std::string fname,
+             const std::vector<T> data,
+             std::string mode = "w") {
     std::vector<size_t> shape;
     shape.push_back(data.size());
-    npy_save(fname, &data[0], shape, mode);
+    NpySave(fname, &data[0], shape, mode);
 }
 
 template <typename T>
-std::vector<char> create_npy_header(const std::vector<size_t>& shape) {
+std::vector<char> CreateNpyHeader(const std::vector<size_t>& shape) {
     std::vector<char> dict;
     dict += "{'descr': '";
     dict += BigEndianTest();
-    dict += map_type(typeid(T));
+    dict += MapType(typeid(T));
     dict += std::to_string(sizeof(T));
     dict += "', 'fortran_order': False, 'shape': (";
     dict += std::to_string(shape[0]);

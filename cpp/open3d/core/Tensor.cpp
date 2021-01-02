@@ -1222,14 +1222,13 @@ void Tensor::Save(const std::string& file_name) const {
     }
     std::vector<size_t> shape(shape_.begin(), shape_.end());
     DISPATCH_DTYPE_TO_TEMPLATE_WITH_BOOL(dtype_, [&]() {
-        npy_save(file_name,
-                 static_cast<const scalar_t*>(t_contiguous.GetDataPtr()),
-                 shape);
+        NpySave(file_name,
+                static_cast<const scalar_t*>(t_contiguous.GetDataPtr()), shape);
     });
 }
 
 Tensor Tensor::Load(const std::string& file_name) {
-    NpyArray np_array = npy_load(file_name);
+    NpyArray np_array = NpyLoad(file_name);
     SizeVector shape(np_array.GetShape().begin(), np_array.GetShape().end());
     Tensor t;
     DISPATCH_DTYPE_TO_TEMPLATE_WITH_BOOL(np_array.GetDtype(), [&]() {

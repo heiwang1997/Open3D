@@ -46,7 +46,7 @@ char BigEndianTest() {
     return (((char *)&x)[0]) ? '<' : '>';
 }
 
-char map_type(const std::type_info &t) {
+char MapType(const std::type_info &t) {
     if (t == typeid(float)) return 'f';
     if (t == typeid(double)) return 'f';
     if (t == typeid(long double)) return 'f';
@@ -89,15 +89,15 @@ std::vector<char> &operator+=(std::vector<char> &lhs, const char *rhs) {
     return lhs;
 }
 
-void parse_npy_header(FILE *fp,
-                      char &type,
-                      size_t &word_size,
-                      std::vector<size_t> &shape,
-                      bool &fortran_order) {
+void ParseNpyHeader(FILE *fp,
+                    char &type,
+                    size_t &word_size,
+                    std::vector<size_t> &shape,
+                    bool &fortran_order) {
     char buffer[256];
     size_t res = fread(buffer, sizeof(char), 11, fp);
     if (res != 11) {
-        utility::LogError("parse_npy_header: failed fread");
+        utility::LogError("ParseNpyHeader: failed fread");
     }
     std::string header = fgets(buffer, 256, fp);
     assert(header[header.size() - 1] == '\n');
@@ -108,7 +108,7 @@ void parse_npy_header(FILE *fp,
     loc1 = header.find("fortran_order");
     if (loc1 == std::string::npos) {
         utility::LogError(
-                "parse_npy_header: failed to find header keyword: "
+                "ParseNpyHeader: failed to find header keyword: "
                 "'fortran_order'");
     }
 
@@ -120,7 +120,7 @@ void parse_npy_header(FILE *fp,
     loc2 = header.find(")");
     if (loc1 == std::string::npos || loc2 == std::string::npos) {
         utility::LogError(
-                "parse_npy_header: failed to find header keyword: '(' or ')'");
+                "ParseNpyHeader: failed to find header keyword: '(' or ')'");
     }
 
     std::regex num_regex("[0-9][0-9]*");
@@ -139,7 +139,7 @@ void parse_npy_header(FILE *fp,
     loc1 = header.find("descr");
     if (loc1 == std::string::npos) {
         utility::LogError(
-                "parse_npy_header: failed to find header keyword: 'descr'");
+                "ParseNpyHeader: failed to find header keyword: 'descr'");
     }
 
     loc1 += 9;
@@ -149,7 +149,7 @@ void parse_npy_header(FILE *fp,
     (void)littleEndian;
 
     type = header[loc1 + 1];
-    // assert(type == map_type(T));
+    // assert(type == MapType(T));
 
     std::string str_ws = header.substr(loc1 + 2);
     loc2 = str_ws.find("'");
@@ -161,7 +161,7 @@ NpyArray load_the_npy_file(FILE *fp) {
     size_t word_size;
     bool fortran_order;
     char type;
-    parse_npy_header(fp, type, word_size, shape, fortran_order);
+    ParseNpyHeader(fp, type, word_size, shape, fortran_order);
 
     NpyArray arr(shape, type, word_size, fortran_order);
     size_t nread = fread(arr.GetDataPtr<char>(), 1, arr.NumBytes(), fp);
@@ -172,11 +172,11 @@ NpyArray load_the_npy_file(FILE *fp) {
     return arr;
 }
 
-NpyArray npy_load(std::string fname) {
+NpyArray NpyLoad(std::string fname) {
     FILE *fp = fopen(fname.c_str(), "rb");
 
     if (!fp) {
-        utility::LogError("npy_load: Unable to open file {}.", fname);
+        utility::LogError("NpyLoad: Unable to open file {}.", fname);
     }
 
     NpyArray arr = load_the_npy_file(fp);
