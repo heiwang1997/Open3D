@@ -86,8 +86,8 @@ inline std::string ToByteString(const T& rhs) {
     return ss.str();
 }
 
-inline std::vector<char> CreateNpyHeader(const std::vector<size_t>& shape,
-                                         const Dtype& dtype) {
+inline std::vector<char> CreateNumpyHeader(const std::vector<size_t>& shape,
+                                           const Dtype& dtype) {
     // {}     -> "()"
     // {1}    -> "(1,)"
     // {1, 2} -> "(1, 2)"
@@ -138,12 +138,12 @@ inline std::vector<char> CreateNpyHeader(const std::vector<size_t>& shape,
     return std::vector<char>(s.begin(), s.end());
 }
 
-class NpyArray {
+class NumpyArray {
 public:
-    NpyArray(const std::vector<size_t>& shape,
-             char type,
-             size_t word_size,
-             bool fortran_order)
+    NumpyArray(const std::vector<size_t>& shape,
+               char type,
+               size_t word_size,
+               bool fortran_order)
         : shape_(shape),
           type_(type),
           word_size_(word_size),
@@ -156,7 +156,7 @@ public:
                 std::make_shared<std::vector<char>>(num_elements_ * word_size_);
     }
 
-    NpyArray()
+    NumpyArray()
         : shape_(0), word_size_(0), fortran_order_(0), num_elements_(0) {}
 
     template <typename T>
@@ -201,35 +201,35 @@ public:
 
     size_t NumBytes() const { return data_holder->size(); }
 
-    static NpyArray Load(const std::string& file_name) {
+    static NumpyArray Load(const std::string& file_name) {
         FILE* fp = fopen(file_name.c_str(), "rb");
         if (!fp) {
-            utility::LogError("NpyLoad: Unable to open file {}.", file_name);
+            utility::LogError("NumpyLoad: Unable to open file {}.", file_name);
         }
         std::vector<size_t> shape;
         size_t word_size;
         bool fortran_order;
         char type;
-        ParseNpyHeader(fp, type, word_size, shape, fortran_order);
-        NpyArray arr(shape, type, word_size, fortran_order);
+        ParseNumpyHeader(fp, type, word_size, shape, fortran_order);
+        NumpyArray arr(shape, type, word_size, fortran_order);
         size_t nread = fread(arr.GetDataPtr<char>(), 1, arr.NumBytes(), fp);
         if (nread != arr.NumBytes()) {
-            utility::LogError("LoadTheNpyFile: failed fread");
+            utility::LogError("LoadTheNumpyFile: failed fread");
         }
         fclose(fp);
         return arr;
     }
 
 private:
-    static void ParseNpyHeader(FILE* fp,
-                               char& type,
-                               size_t& word_size,
-                               std::vector<size_t>& shape,
-                               bool& fortran_order) {
+    static void ParseNumpyHeader(FILE* fp,
+                                 char& type,
+                                 size_t& word_size,
+                                 std::vector<size_t>& shape,
+                                 bool& fortran_order) {
         char buffer[256];
         size_t res = fread(buffer, sizeof(char), 11, fp);
         if (res != 11) {
-            utility::LogError("ParseNpyHeader: failed fread");
+            utility::LogError("ParseNumpyHeader: failed fread");
         }
         std::string header = fgets(buffer, 256, fp);
         assert(header[header.size() - 1] == '\n');
@@ -240,7 +240,7 @@ private:
         loc1 = header.find("fortran_order");
         if (loc1 == std::string::npos) {
             utility::LogError(
-                    "ParseNpyHeader: failed to find header keyword: "
+                    "ParseNumpyHeader: failed to find header keyword: "
                     "'fortran_order'");
         }
 
@@ -252,7 +252,7 @@ private:
         loc2 = header.find(")");
         if (loc1 == std::string::npos || loc2 == std::string::npos) {
             utility::LogError(
-                    "ParseNpyHeader: failed to find header keyword: '(' or "
+                    "ParseNumpyHeader: failed to find header keyword: '(' or "
                     "')'");
         }
 
@@ -272,7 +272,7 @@ private:
         loc1 = header.find("descr");
         if (loc1 == std::string::npos) {
             utility::LogError(
-                    "ParseNpyHeader: failed to find header keyword: 'descr'");
+                    "ParseNumpyHeader: failed to find header keyword: 'descr'");
         }
 
         loc1 += 9;
@@ -296,12 +296,12 @@ private:
     size_t num_elements_;
 };
 
-inline void NpySave(std::string fname,
-                    const void* data,
-                    const std::vector<size_t>& shape,
-                    const Dtype& dtype) {
+inline void NumpySave(std::string fname,
+                      const void* data,
+                      const std::vector<size_t>& shape,
+                      const Dtype& dtype) {
     FILE* fp = fopen(fname.c_str(), "wb");
-    std::vector<char> header = CreateNpyHeader(shape, dtype);
+    std::vector<char> header = CreateNumpyHeader(shape, dtype);
     size_t num_elements = std::accumulate(shape.begin(), shape.end(), 1,
                                           std::multiplies<size_t>());
 

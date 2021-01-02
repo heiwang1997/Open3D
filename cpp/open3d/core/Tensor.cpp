@@ -1221,11 +1221,11 @@ void Tensor::Save(const std::string& file_name) const {
         t_contiguous = t_contiguous.Copy(Device("CPU:0"));
     }
     std::vector<size_t> shape(shape_.begin(), shape_.end());
-    NpySave(file_name, t_contiguous.GetDataPtr(), shape, dtype_);
+    NumpySave(file_name, t_contiguous.GetDataPtr(), shape, dtype_);
 }
 
 Tensor Tensor::Load(const std::string& file_name) {
-    NpyArray np_array = NpyArray::Load(file_name);
+    NumpyArray np_array = NumpyArray::Load(file_name);
     Tensor t;
     DISPATCH_DTYPE_TO_TEMPLATE_WITH_BOOL(np_array.GetDtype(), [&]() {
         t = Tensor(np_array.GetDataPtr<scalar_t>(), np_array.GetShape(),
