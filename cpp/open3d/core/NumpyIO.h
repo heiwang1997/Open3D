@@ -137,11 +137,13 @@ inline std::vector<char> CreateNpyHeaderV2(const std::vector<size_t>& shape) {
         dict_ss << ",";
     }
     dict_ss << "), }";
-    // pad with spaces so that preamble+dict is modulo 16 bytes. preamble is 10
-    // bytes. dict needs to end with \n
-    int remainder =
-            16 - (10 + dict_ss.str().size()) % 16;  // Value 1, 2, ... 16.
-    for (int i = 0; i < remainder - 1; ++i) {
+    // Pad with spaces so that preamble+dict is modulo 16 bytes.
+    // - Preamble is 10 bytes.
+    // - Dict needs to end with '\n'.
+    // - Header dict size includes the padding size and '\n'.
+    // space_padding = {0, 1, 2, ... 15}.
+    int space_padding = 16 - (10 + dict_ss.str().size()) % 16 - 1;
+    for (int i = 0; i < space_padding; ++i) {
         dict_ss << ' ';
     }
     dict_ss << '\n';
@@ -155,7 +157,7 @@ inline std::vector<char> CreateNpyHeaderV2(const std::vector<size_t>& shape) {
     ss << (char)0x01;
     // Minor version of numpy format.
     ss << (char)0x00;
-    // Header dict size.
+    // Header dict size (full header size - 10).
     ss << ToByteString((uint16_t)dict_ss.str().size());
     // Header dict.
     ss << dict_ss.str();
