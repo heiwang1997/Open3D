@@ -177,7 +177,7 @@ private:
 };
 
 template <typename T>
-std::vector<char>& operator+=(std::vector<char>& lhs, const T rhs) {
+inline std::vector<char>& operator+=(std::vector<char>& lhs, const T rhs) {
     // Write in little endian
     for (size_t byte = 0; byte < sizeof(T); byte++) {
         char val = *((char*)&rhs + byte);
@@ -187,9 +187,22 @@ std::vector<char>& operator+=(std::vector<char>& lhs, const T rhs) {
 }
 
 template <>
-std::vector<char>& operator+=(std::vector<char>& lhs, const std::string rhs);
+inline std::vector<char>& operator+=(std::vector<char>& lhs,
+                                     const std::string rhs) {
+    lhs.insert(lhs.end(), rhs.begin(), rhs.end());
+    return lhs;
+}
+
 template <>
-std::vector<char>& operator+=(std::vector<char>& lhs, const char* rhs);
+inline std::vector<char>& operator+=(std::vector<char>& lhs, const char* rhs) {
+    // write in little endian
+    size_t len = strlen(rhs);
+    lhs.reserve(len);
+    for (size_t byte = 0; byte < len; byte++) {
+        lhs.push_back(rhs[byte]);
+    }
+    return lhs;
+}
 
 template <typename T>
 void NpySave(std::string fname,
