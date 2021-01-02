@@ -150,8 +150,7 @@ inline std::vector<char> CreateNpyHeaderV2(const std::vector<size_t>& shape) {
     std::string dict = fmt::format(
             "{{'descr': '{}{}{}', 'fortran_order': False, 'shape': {}, }}",
             BigEndianChar(), TypeToChar(typeid(T)), sizeof(T), shape_ss.str());
-    // space_padding = {0, 1, 2, ... 15}.
-    size_t space_padding = 16 - (10 + dict.size()) % 16 - 1;
+    size_t space_padding = 16 - (10 + dict.size()) % 16 - 1;  // {0, 1, ..., 15}
     dict.insert(dict.end(), space_padding, ' ');
     dict += '\n';
 
