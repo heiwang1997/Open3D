@@ -143,9 +143,9 @@ inline std::vector<char> CreateNumpyHeader(const SizeVector& shape,
 
 class NumpyArray {
 public:
-    NumpyArray(const std::vector<size_t>& shape,
+    NumpyArray(const SizeVector& shape,
                char type,
-               size_t word_size,
+               int64_t word_size,
                bool fortran_order)
         : shape_(shape),
           type_(type),
@@ -202,7 +202,7 @@ public:
 
     bool GetFortranOrder() const { return fortran_order_; }
 
-    size_t NumBytes() const { return num_elements_ * word_size_; }
+    int64_t NumBytes() const { return num_elements_ * word_size_; }
 
     Tensor ToTensor() const {
         Tensor t;
@@ -217,14 +217,15 @@ public:
         if (!fp) {
             utility::LogError("NumpyLoad: Unable to open file {}.", file_name);
         }
-        std::vector<size_t> shape;
-        size_t word_size;
+        SizeVector shape;
+        int64_t word_size;
         bool fortran_order;
         char type;
-        ParseNumpyHeader(fp, type, word_size, shape, fortran_order);
+        std::tie(type, word_size, shape, fortran_order) = ParseNumpyHeader(fp);
         NumpyArray arr(shape, type, word_size, fortran_order);
-        size_t nread = fread(arr.GetDataPtr<char>(), 1, arr.NumBytes(), fp);
-        if (nread != arr.NumBytes()) {
+        size_t nread =
+                fread(arr.GetDataPtr<char>(), 1, (size_t)arr.NumBytes(), fp);
+        if (nread != (size_t)arr.NumBytes()) {
             utility::LogError("LoadTheNumpyFile: failed fread");
         }
         fclose(fp);
@@ -232,11 +233,13 @@ public:
     }
 
 private:
-    static void ParseNumpyHeader(FILE* fp,
-                                 char& type,
-                                 size_t& word_size,
-                                 std::vector<size_t>& shape,
-                                 bool& fortran_order) {
+    static std::tuple<char, int64_t, SizeVector, bool> ParseNumpyHeader(
+            FILE* fp) {
+        char type;
+        int64_t word_size;
+        SizeVector shape;
+        bool fortran_order;
+
         char buffer[256];
         size_t res = fread(buffer, sizeof(char), 11, fp);
         if (res != 11) {
@@ -297,14 +300,16 @@ private:
         std::string str_ws = header.substr(loc1 + 2);
         loc2 = str_ws.find("'");
         word_size = atoi(str_ws.substr(0, loc2).c_str());
+
+        return std::make_tuple(type, word_size, shape, fortran_order);
     }
 
     std::shared_ptr<Blob> blob_ = nullptr;
-    std::vector<size_t> shape_;
+    SizeVector shape_;
     char type_;
-    size_t word_size_;
+    int64_t word_size_;
     bool fortran_order_;
-    size_t num_elements_;
+    int64_t num_elements_;
 };
 
 inline void NumpySave(std::string fname,
@@ -313,13 +318,10 @@ inline void NumpySave(std::string fname,
                       const Dtype& dtype) {
     FILE* fp = fopen(fname.c_str(), "wb");
     std::vector<char> header = CreateNumpyHeader(shape, dtype);
-    size_t num_elements = std::accumulate(shape.begin(), shape.end(), 1,
-                                          std::multiplies<size_t>());
-
     fseek(fp, 0, SEEK_SET);
     fwrite(&header[0], sizeof(char), header.size(), fp);
     fseek(fp, 0, SEEK_END);
-    fwrite(data, dtype.ByteSize(), num_elements, fp);
+    fwrite(data, dtype.ByteSize(), (size_t)shape.NumElements(), fp);
     fclose(fp);
 }
 
