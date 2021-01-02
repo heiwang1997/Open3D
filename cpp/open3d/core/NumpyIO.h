@@ -46,22 +46,23 @@ namespace open3d {
 namespace core {
 
 struct NpyArray {
-    NpyArray(const std::vector<size_t>& _shape,
+    NpyArray(const std::vector<size_t>& shape,
              char type,
-             size_t _word_size,
-             bool _fortran_order)
-        : shape(_shape),
+             size_t word_size,
+             bool fortran_order)
+        : shape_(shape),
           type_(type),
-          word_size(_word_size),
-          fortran_order(_fortran_order) {
+          word_size_(word_size),
+          fortran_order_(fortran_order) {
         num_vals = 1;
-        for (size_t i = 0; i < shape.size(); i++) {
-            num_vals *= shape[i];
+        for (size_t i = 0; i < shape_.size(); i++) {
+            num_vals *= shape_[i];
         }
-        data_holder = std::make_shared<std::vector<char>>(num_vals * word_size);
+        data_holder =
+                std::make_shared<std::vector<char>>(num_vals * word_size_);
     }
 
-    NpyArray() : shape(0), word_size(0), fortran_order(0), num_vals(0) {}
+    NpyArray() : shape_(0), word_size_(0), fortran_order_(0), num_vals(0) {}
 
     template <typename T>
     T* data() {
@@ -83,33 +84,38 @@ struct NpyArray {
 
     Dtype GetDtype() const {
         Dtype dtype(Dtype::DtypeCode::Undefined, 1, "undefined");
-        if (type_ == 'f' && word_size == 4) {
+        if (type_ == 'f' && word_size_ == 4) {
             dtype = Dtype::Float32;
-        } else if (type_ == 'f' && word_size == 8) {
+        } else if (type_ == 'f' && word_size_ == 8) {
             dtype = Dtype::Float64;
-        } else if (type_ == 'i' && word_size == 4) {
+        } else if (type_ == 'i' && word_size_ == 4) {
             dtype = Dtype::Int32;
-        } else if (type_ == 'i' && word_size == 8) {
+        } else if (type_ == 'i' && word_size_ == 8) {
             dtype = Dtype::Int64;
-        } else if (type_ == 'u' && word_size == 1) {
+        } else if (type_ == 'u' && word_size_ == 1) {
             dtype = Dtype::UInt8;
-        } else if (type_ == 'u' && word_size == 2) {
+        } else if (type_ == 'u' && word_size_ == 2) {
             dtype = Dtype::UInt16;
         } else if (type_ == 'b') {
             dtype = Dtype::Bool;
         }
         if (dtype.GetDtypeCode() == Dtype::DtypeCode::Undefined) {
-            utility::LogError("Unsupported Numpy type {} word_size {}.", type_,
-                              word_size);
+            utility::LogError("Unsupported Numpy type {} word_size_ {}.", type_,
+                              word_size_);
         }
         return dtype;
     }
 
+    std::vector<size_t>& GetShape() { return shape_; }
+
+    bool GetFortranOrder() const { return fortran_order_; }
+
+private:
     std::shared_ptr<std::vector<char>> data_holder;
-    std::vector<size_t> shape;
+    std::vector<size_t> shape_;
     char type_;
-    size_t word_size;
-    bool fortran_order;
+    size_t word_size_;
+    bool fortran_order_;
     size_t num_vals;
 };
 
