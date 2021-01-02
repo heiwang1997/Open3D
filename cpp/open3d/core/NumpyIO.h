@@ -51,12 +51,12 @@
 namespace open3d {
 namespace core {
 
-inline char BigEndianTest() {
+inline char BigEndianChar() {
     int x = 1;
     return (((char*)&x)[0]) ? '<' : '>';
 }
 
-inline char MapType(const std::type_info& t) {
+inline char TypeToChar(const std::type_info& t) {
     if (t == typeid(float)) return 'f';
     if (t == typeid(double)) return 'f';
     if (t == typeid(long double)) return 'f';
@@ -122,24 +122,29 @@ inline std::vector<char>& operator+=(std::vector<char>& lhs, const char* rhs) {
 
 template <typename T>
 inline std::vector<char> CreateNpyHeaderV2(const std::vector<size_t>& shape) {
-    std::vector<char> dict;
-    dict += "{'descr': '";
-    dict += BigEndianTest();
-    dict += MapType(typeid(T));
-    dict += std::to_string(sizeof(T));
-    dict += "', 'fortran_order': False, 'shape': (";
-    dict += std::to_string(shape[0]);
+    std::stringstream dict_ss;
+    dict_ss << "{'descr': '";
+    dict_ss << BigEndianChar();
+    dict_ss << TypeToChar(typeid(T));
+    dict_ss << std::to_string(sizeof(T));
+    dict_ss << "', 'fortran_order': False, 'shape': (";
+    dict_ss << std::to_string(shape[0]);
     for (size_t i = 1; i < shape.size(); i++) {
-        dict += ", ";
-        dict += std::to_string(shape[i]);
+        dict_ss << ", ";
+        dict_ss << std::to_string(shape[i]);
     }
-    if (shape.size() == 1) dict += ",";
-    dict += "), }";
+    if (shape.size() == 1) {
+        dict_ss << ",";
+    }
+    dict_ss << "), }";
     // pad with spaces so that preamble+dict is modulo 16 bytes. preamble is 10
     // bytes. dict needs to end with \n
-    int remainder = 16 - (10 + dict.size()) % 16;
-    dict.insert(dict.end(), remainder, ' ');
-    dict.back() = '\n';
+    int remainder =
+            16 - (10 + dict_ss.str().size()) % 16;  // Value 1, 2, ... 16.
+    for (int i = 0; i < remainder - 1; ++i) {
+        dict_ss << ' ';
+    }
+    dict_ss << '\n';
 
     std::stringstream ss;
 
@@ -151,11 +156,10 @@ inline std::vector<char> CreateNpyHeaderV2(const std::vector<size_t>& shape) {
     // Minor version of numpy format.
     ss << (char)0x00;
     // Header dict size.
-    ss << ToByteString((uint16_t)dict.size());
+    ss << ToByteString((uint16_t)dict_ss.str().size());
     // Header dict.
-    for (const char& c : dict) {
-        ss << c;
-    }
+    ss << dict_ss.str();
+
     std::string s = ss.str();
     return std::vector<char>(s.begin(), s.end());
 }
@@ -164,8 +168,8 @@ template <typename T>
 inline std::vector<char> CreateNpyHeader(const std::vector<size_t>& shape) {
     std::vector<char> dict;
     dict += "{'descr': '";
-    dict += BigEndianTest();
-    dict += MapType(typeid(T));
+    dict += BigEndianChar();
+    dict += TypeToChar(typeid(T));
     dict += std::to_string(sizeof(T));
     dict += "', 'fortran_order': False, 'shape': (";
     dict += std::to_string(shape[0]);
@@ -192,6 +196,8 @@ inline std::vector<char> CreateNpyHeader(const std::vector<size_t>& shape) {
     std::vector<char> header_v2 = CreateNpyHeaderV2<T>(shape);
     if (header != header_v2) {
         utility::LogError("HeaderV2 mismatch!");
+        utility::LogInfo("{}", header);
+        utility::LogInfo("{}", header_v2);
     }
     return header;
 }
@@ -340,7 +346,7 @@ private:
         (void)littleEndian;
 
         type = header[loc1 + 1];
-        // assert(type == MapType(T));
+        // assert(type == TypeToChar(T));
 
         std::string str_ws = header.substr(loc1 + 2);
         loc2 = str_ws.find("'");
