@@ -325,18 +325,5 @@ private:
     int64_t num_elements_;
 };
 
-// inline void NumpySave(std::string fname,
-//                       const void* data,
-//                       const SizeVector& shape,
-//                       const Dtype& dtype) {
-//     FILE* fp = fopen(fname.c_str(), "wb");
-//     std::vector<char> header = CreateNumpyHeader(shape, dtype);
-//     fseek(fp, 0, SEEK_SET);
-//     fwrite(&header[0], sizeof(char), header.size(), fp);
-//     fseek(fp, 0, SEEK_END);
-//     fwrite(data, dtype.ByteSize(), (size_t)shape.NumElements(), fp);
-//     fclose(fp);
-// }
-
 }  // namespace core
 }  // namespace open3d
