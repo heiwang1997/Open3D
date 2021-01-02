@@ -45,8 +45,10 @@
 #include <typeinfo>
 #include <vector>
 
+#include "open3d/core/Dispatch.h"
 #include "open3d/core/Dtype.h"
 #include "open3d/core/SizeVector.h"
+#include "open3d/core/Tensor.h"
 
 namespace open3d {
 namespace core {
@@ -200,6 +202,14 @@ public:
     bool GetFortranOrder() const { return fortran_order_; }
 
     size_t NumBytes() const { return data_holder->size(); }
+
+    Tensor ToTensor() const {
+        Tensor t;
+        DISPATCH_DTYPE_TO_TEMPLATE_WITH_BOOL(GetDtype(), [&]() {
+            t = Tensor(GetDataPtr<scalar_t>(), GetShape(), GetDtype());
+        });
+        return t;
+    }
 
     static NumpyArray Load(const std::string& file_name) {
         FILE* fp = fopen(file_name.c_str(), "rb");

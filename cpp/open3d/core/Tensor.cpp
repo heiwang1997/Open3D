@@ -1225,13 +1225,7 @@ void Tensor::Save(const std::string& file_name) const {
 }
 
 Tensor Tensor::Load(const std::string& file_name) {
-    NumpyArray np_array = NumpyArray::Load(file_name);
-    Tensor t;
-    DISPATCH_DTYPE_TO_TEMPLATE_WITH_BOOL(np_array.GetDtype(), [&]() {
-        t = Tensor(np_array.GetDataPtr<scalar_t>(), np_array.GetShape(),
-                   np_array.GetDtype());
-    });
-    return t;
+    return NumpyArray::Load(file_name).ToTensor();
 }
 
 bool Tensor::AllClose(const Tensor& other, double rtol, double atol) const {
