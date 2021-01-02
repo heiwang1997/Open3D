@@ -80,7 +80,7 @@ struct NpyArray {
         return std::vector<T>(p, p + num_vals);
     }
 
-    size_t num_bytes() const { return data_holder->size(); }
+    size_t NumBytes() const { return data_holder->size(); }
 
     Dtype GetDtype() const {
         Dtype dtype(Dtype::DtypeCode::Undefined, 1, "undefined");

@@ -157,8 +157,8 @@ NpyArray load_the_npy_file(FILE *fp) {
     parse_npy_header(fp, type, word_size, shape, fortran_order);
 
     NpyArray arr(shape, type, word_size, fortran_order);
-    size_t nread = fread(arr.data<char>(), 1, arr.num_bytes(), fp);
-    if (nread != arr.num_bytes())
+    size_t nread = fread(arr.data<char>(), 1, arr.NumBytes(), fp);
+    if (nread != arr.NumBytes())
         throw std::runtime_error("load_the_npy_file: failed fread");
     return arr;
 }
