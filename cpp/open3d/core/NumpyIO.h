@@ -81,10 +81,24 @@ struct NpyArray {
 
     Dtype GetDtype() const {
         Dtype dtype(Dtype::DtypeCode::Undefined, 1, "undefined");
-        if (type_ == 'f') {
-        } else if (type_ == 'i') {
-        } else if (type_ == 'u') {
+        if (type_ == 'f' && word_size == 4) {
+            dtype = Dtype::Float32;
+        } else if (type_ == 'f' && word_size == 8) {
+            dtype = Dtype::Float64;
+        } else if (type_ == 'i' && word_size == 4) {
+            dtype = Dtype::Int32;
+        } else if (type_ == 'i' && word_size == 8) {
+            dtype = Dtype::Int64;
+        } else if (type_ == 'u' && word_size == 1) {
+            dtype = Dtype::UInt8;
+        } else if (type_ == 'u' && word_size == 2) {
+            dtype = Dtype::UInt16;
         } else if (type_ == 'b') {
+            dtype = Dtype::Bool;
+        }
+        if (dtype.GetDtypeCode() == Dtype::DtypeCode::Undefined) {
+            utility::LogError("Unsupported Numpy type {} word_size {}.", type_,
+                              word_size);
         }
         return dtype;
     }
