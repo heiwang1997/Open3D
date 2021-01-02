@@ -122,21 +122,33 @@ inline std::string ToByteString(const T& rhs) {
 
 template <typename T>
 inline std::vector<char> CreateNpyHeaderV2(const std::vector<size_t>& shape) {
+    std::stringstream shape_ss;
+    if (shape.size() == 0) {
+        shape_ss << "()";
+    } else if (shape.size() == 1) {
+        shape_ss << fmt::format("({},)", shape[0]);
+    } else {
+        shape_ss << "(";
+        shape_ss << shape[0];
+        for (size_t i = 1; i < shape.size(); i++) {
+            shape_ss << ", ";
+            shape_ss << shape[i];
+        }
+        if (shape.size() == 1) {
+            shape_ss << ",";
+        }
+        shape_ss << ")";
+    }
+
     std::stringstream dict_ss;
     dict_ss << "{'descr': '";
     dict_ss << BigEndianChar();
     dict_ss << TypeToChar(typeid(T));
     dict_ss << sizeof(T);
-    dict_ss << "', 'fortran_order': False, 'shape': (";
-    dict_ss << shape[0];
-    for (size_t i = 1; i < shape.size(); i++) {
-        dict_ss << ", ";
-        dict_ss << shape[i];
-    }
-    if (shape.size() == 1) {
-        dict_ss << ",";
-    }
-    dict_ss << "), }";
+    dict_ss << "', 'fortran_order': False, 'shape': ";
+    dict_ss << shape_ss.str();
+    dict_ss << ", }";
+
     // Pad with spaces so that preamble+dict is modulo 16 bytes.
     // - Preamble is 10 bytes.
     // - Dict needs to end with '\n'.
