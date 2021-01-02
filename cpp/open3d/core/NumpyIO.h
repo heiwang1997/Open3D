@@ -79,8 +79,8 @@ inline char DtypeToChar(const Dtype& dtype) {
 template <typename T>
 inline std::string ToByteString(const T& rhs) {
     std::stringstream ss;
-    for (size_t byte = 0; byte < sizeof(T); byte++) {
-        char val = *((char*)&rhs + byte);
+    for (size_t i = 0; i < sizeof(T); i++) {
+        char val = *((char*)&rhs + i);
         ss << val;
     }
     return ss.str();
