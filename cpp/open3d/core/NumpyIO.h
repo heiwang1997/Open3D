@@ -317,14 +317,5 @@ void NpySave(std::string fname,
     fclose(fp);
 }
 
-template <typename T>
-void NpySave(std::string fname,
-             const std::vector<T> data,
-             std::string mode = "w") {
-    std::vector<size_t> shape;
-    shape.push_back(data.size());
-    NpySave(fname, &data[0], shape, mode);
-}
-
 }  // namespace core
 }  // namespace open3d
