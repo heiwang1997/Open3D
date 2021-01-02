@@ -165,50 +165,9 @@ std::vector<char>& operator+=(std::vector<char>& lhs, const char* rhs);
 template <typename T>
 void NpySave(std::string fname,
              const T* data,
-             const std::vector<size_t> shape,
-             std::string mode = "w") {
-    FILE* fp = NULL;
-    std::vector<size_t>
-            true_data_shape;  // if appending, the shape of existing + new data
-
-    if (mode == "a") fp = fopen(fname.c_str(), "r+b");
-
-    if (fp) {
-        // file exists. we need to append to it. read the header, modify the
-        // array size
-        size_t word_size;
-        bool fortran_order;
-        char type;  // TODO: check type consistency.
-        ParseNpyHeader(fp, type, word_size, true_data_shape, fortran_order);
-        assert(!fortran_order);
-        if (word_size != sizeof(T)) {
-            std::cout << "libnpy error: " << fname << " has word size "
-                      << word_size << " but NpySave appending data sized "
-                      << sizeof(T) << "\n";
-            assert(word_size == sizeof(T));
-        }
-        if (true_data_shape.size() != shape.size()) {
-            std::cout << "libnpy error: NpySave attempting to append "
-                         "misdimensioned data to "
-                      << fname << "\n";
-            assert(true_data_shape.size() != shape.size());
-        }
-
-        for (size_t i = 1; i < shape.size(); i++) {
-            if (shape[i] != true_data_shape[i]) {
-                std::cout << "libnpy error: NpySave attempting to append "
-                             "misshaped data to "
-                          << fname << "\n";
-                assert(shape[i] == true_data_shape[i]);
-            }
-        }
-        true_data_shape[0] += shape[0];
-    } else {
-        fp = fopen(fname.c_str(), "wb");
-        true_data_shape = shape;
-    }
-
-    std::vector<char> header = CreateNpyHeader<T>(true_data_shape);
+             const std::vector<size_t> shape) {
+    FILE* fp = fopen(fname.c_str(), "wb");
+    std::vector<char> header = CreateNpyHeader<T>(shape);
     size_t nels = std::accumulate(shape.begin(), shape.end(), 1,
                                   std::multiplies<size_t>());
 
