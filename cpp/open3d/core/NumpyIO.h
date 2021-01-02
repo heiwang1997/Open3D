@@ -124,13 +124,6 @@ public:
         if (!fp) {
             utility::LogError("NpyLoad: Unable to open file {}.", file_name);
         }
-        NpyArray arr = LoadTheNpyFile(fp);
-        fclose(fp);
-        return arr;
-    }
-
-private:
-    static NpyArray LoadTheNpyFile(FILE* fp) {
         std::vector<size_t> shape;
         size_t word_size;
         bool fortran_order;
@@ -141,9 +134,11 @@ private:
         if (nread != arr.NumBytes()) {
             utility::LogError("LoadTheNpyFile: failed fread");
         }
+        fclose(fp);
         return arr;
     }
 
+private:
     std::shared_ptr<std::vector<char>> data_holder;
     std::vector<size_t> shape_;
     char type_;
