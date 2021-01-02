@@ -127,7 +127,7 @@ NpyArray npy_load(std::string fname);
 
 template <typename T>
 std::vector<char>& operator+=(std::vector<char>& lhs, const T rhs) {
-    // write in little endian
+    // Write in little endian
     for (size_t byte = 0; byte < sizeof(T); byte++) {
         char val = *((char*)&rhs + byte);
         lhs.push_back(val);

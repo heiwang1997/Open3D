@@ -96,7 +96,9 @@ void parse_npy_header(FILE *fp,
                       bool &fortran_order) {
     char buffer[256];
     size_t res = fread(buffer, sizeof(char), 11, fp);
-    if (res != 11) throw std::runtime_error("parse_npy_header: failed fread");
+    if (res != 11) {
+        utility::LogError("parse_npy_header: failed fread");
+    }
     std::string header = fgets(buffer, 256, fp);
     assert(header[header.size() - 1] == '\n');
 
@@ -104,19 +106,22 @@ void parse_npy_header(FILE *fp,
 
     // fortran order
     loc1 = header.find("fortran_order");
-    if (loc1 == std::string::npos)
-        throw std::runtime_error(
+    if (loc1 == std::string::npos) {
+        utility::LogError(
                 "parse_npy_header: failed to find header keyword: "
                 "'fortran_order'");
+    }
+
     loc1 += 16;
     fortran_order = (header.substr(loc1, 4) == "True" ? true : false);
 
     // shape
     loc1 = header.find("(");
     loc2 = header.find(")");
-    if (loc1 == std::string::npos || loc2 == std::string::npos)
-        throw std::runtime_error(
+    if (loc1 == std::string::npos || loc2 == std::string::npos) {
+        utility::LogError(
                 "parse_npy_header: failed to find header keyword: '(' or ')'");
+    }
 
     std::regex num_regex("[0-9][0-9]*");
     std::smatch sm;
@@ -132,9 +137,11 @@ void parse_npy_header(FILE *fp,
     // byte order code | stands for not applicable.
     // not sure when this applies except for byte array
     loc1 = header.find("descr");
-    if (loc1 == std::string::npos)
-        throw std::runtime_error(
+    if (loc1 == std::string::npos) {
+        utility::LogError(
                 "parse_npy_header: failed to find header keyword: 'descr'");
+    }
+
     loc1 += 9;
     bool littleEndian =
             (header[loc1] == '<' || header[loc1] == '|' ? true : false);
@@ -158,15 +165,19 @@ NpyArray load_the_npy_file(FILE *fp) {
 
     NpyArray arr(shape, type, word_size, fortran_order);
     size_t nread = fread(arr.data<char>(), 1, arr.NumBytes(), fp);
-    if (nread != arr.NumBytes())
-        throw std::runtime_error("load_the_npy_file: failed fread");
+    if (nread != arr.NumBytes()) {
+        utility::LogError("load_the_npy_file: failed fread");
+    }
+
     return arr;
 }
 
 NpyArray npy_load(std::string fname) {
     FILE *fp = fopen(fname.c_str(), "rb");
 
-    if (!fp) throw std::runtime_error("npy_load: Unable to open file " + fname);
+    if (!fp) {
+        utility::LogError("npy_load: Unable to open file {}.", fname);
+    }
 
     NpyArray arr = load_the_npy_file(fp);
 
