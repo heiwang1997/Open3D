@@ -122,6 +122,9 @@ inline std::string ToByteString(const T& rhs) {
 
 template <typename T>
 inline std::vector<char> CreateNpyHeaderV2(const std::vector<size_t>& shape) {
+    // {}     -> "()"
+    // {1}    -> "(1,)"
+    // {1, 2} -> "(1, 2)"
     std::stringstream shape_ss;
     if (shape.size() == 0) {
         shape_ss << "()";
@@ -140,28 +143,19 @@ inline std::vector<char> CreateNpyHeaderV2(const std::vector<size_t>& shape) {
         shape_ss << ")";
     }
 
-    std::stringstream dict_ss;
-    dict_ss << "{'descr': '";
-    dict_ss << BigEndianChar();
-    dict_ss << TypeToChar(typeid(T));
-    dict_ss << sizeof(T);
-    dict_ss << "', 'fortran_order': False, 'shape': ";
-    dict_ss << shape_ss.str();
-    dict_ss << ", }";
-
     // Pad with spaces so that preamble+dict is modulo 16 bytes.
     // - Preamble is 10 bytes.
     // - Dict needs to end with '\n'.
     // - Header dict size includes the padding size and '\n'.
+    std::string dict = fmt::format(
+            "{{'descr': '{}{}{}', 'fortran_order': False, 'shape': {}, }}",
+            BigEndianChar(), TypeToChar(typeid(T)), sizeof(T), shape_ss.str());
     // space_padding = {0, 1, 2, ... 15}.
-    int space_padding = 16 - (10 + dict_ss.str().size()) % 16 - 1;
-    for (int i = 0; i < space_padding; ++i) {
-        dict_ss << ' ';
-    }
-    dict_ss << '\n';
+    size_t space_padding = 16 - (10 + dict.size()) % 16 - 1;
+    dict.insert(dict.end(), space_padding, ' ');
+    dict += '\n';
 
     std::stringstream ss;
-
     // "Magic" values.
     ss << (char)0x93;
     ss << "NUMPY";
@@ -170,9 +164,9 @@ inline std::vector<char> CreateNpyHeaderV2(const std::vector<size_t>& shape) {
     // Minor version of numpy format.
     ss << (char)0x00;
     // Header dict size (full header size - 10).
-    ss << ToByteString((uint16_t)dict_ss.str().size());
+    ss << ToByteString((uint16_t)dict.size());
     // Header dict.
-    ss << dict_ss.str();
+    ss << dict;
 
     std::string s = ss.str();
     return std::vector<char>(s.begin(), s.end());
