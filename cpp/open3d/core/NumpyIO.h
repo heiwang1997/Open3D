@@ -154,7 +154,7 @@ public:
         for (size_t i = 0; i < shape_.size(); i++) {
             num_elements_ *= shape_[i];
         }
-        data_holder =
+        data_holder_ =
                 std::make_shared<std::vector<char>>(num_elements_ * word_size_);
     }
 
@@ -163,12 +163,12 @@ public:
 
     template <typename T>
     T* GetDataPtr() {
-        return reinterpret_cast<T*>(&(*data_holder)[0]);
+        return reinterpret_cast<T*>(&(*data_holder_)[0]);
     }
 
     template <typename T>
     const T* GetDataPtr() const {
-        return reinterpret_cast<T*>(&(*data_holder)[0]);
+        return reinterpret_cast<T*>(&(*data_holder_)[0]);
     }
 
     Dtype GetDtype() const {
@@ -201,7 +201,7 @@ public:
 
     bool GetFortranOrder() const { return fortran_order_; }
 
-    size_t NumBytes() const { return data_holder->size(); }
+    size_t NumBytes() const { return data_holder_->size(); }
 
     Tensor ToTensor() const {
         Tensor t;
@@ -298,7 +298,7 @@ private:
         word_size = atoi(str_ws.substr(0, loc2).c_str());
     }
 
-    std::shared_ptr<std::vector<char>> data_holder;
+    std::shared_ptr<std::vector<char>> data_holder_;
     std::vector<size_t> shape_;
     char type_;
     size_t word_size_;
