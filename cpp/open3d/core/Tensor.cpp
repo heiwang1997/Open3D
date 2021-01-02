@@ -1221,10 +1221,7 @@ void Tensor::Save(const std::string& file_name) const {
         t_contiguous = t_contiguous.Copy(Device("CPU:0"));
     }
     std::vector<size_t> shape(shape_.begin(), shape_.end());
-    DISPATCH_DTYPE_TO_TEMPLATE_WITH_BOOL(dtype_, [&]() {
-        NpySave(file_name,
-                static_cast<const scalar_t*>(t_contiguous.GetDataPtr()), shape);
-    });
+    NpySave(file_name, t_contiguous.GetDataPtr(), shape, dtype_);
 }
 
 Tensor Tensor::Load(const std::string& file_name) {
