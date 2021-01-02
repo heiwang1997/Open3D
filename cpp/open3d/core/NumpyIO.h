@@ -41,6 +41,7 @@
 #include <vector>
 
 #include "open3d/core/Dtype.h"
+#include "open3d/core/SizeVector.h"
 
 namespace open3d {
 namespace core {
@@ -101,7 +102,9 @@ public:
         return dtype;
     }
 
-    std::vector<size_t>& GetShape() { return shape_; }
+    SizeVector GetShape() const {
+        return SizeVector(shape_.begin(), shape_.end());
+    }
 
     bool GetFortranOrder() const { return fortran_order_; }
 
