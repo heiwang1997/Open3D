@@ -26,22 +26,15 @@
 
 #pragma once
 
-#include <stdint.h>
-
 #include <algorithm>
 #include <cassert>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
 #include <iomanip>
 #include <iostream>
-#include <map>
 #include <memory>
 #include <numeric>
 #include <regex>
 #include <sstream>
 #include <string>
-#include <typeinfo>
 #include <vector>
 
 #include "open3d/core/Blob.h"
