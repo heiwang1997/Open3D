@@ -94,34 +94,6 @@ inline char DtypeToChar(const Dtype& dtype) {
 }
 
 template <typename T>
-inline std::vector<char>& operator+=(std::vector<char>& lhs, const T rhs) {
-    // Write in little endian
-    for (size_t byte = 0; byte < sizeof(T); byte++) {
-        char val = *((char*)&rhs + byte);
-        lhs.push_back(val);
-    }
-    return lhs;
-}
-
-template <>
-inline std::vector<char>& operator+=(std::vector<char>& lhs,
-                                     const std::string rhs) {
-    lhs.insert(lhs.end(), rhs.begin(), rhs.end());
-    return lhs;
-}
-
-template <>
-inline std::vector<char>& operator+=(std::vector<char>& lhs, const char* rhs) {
-    // write in little endian
-    size_t len = strlen(rhs);
-    lhs.reserve(len);
-    for (size_t byte = 0; byte < len; byte++) {
-        lhs.push_back(rhs[byte]);
-    }
-    return lhs;
-}
-
-template <typename T>
 inline std::string ToByteString(const T& rhs) {
     std::stringstream ss;
     for (size_t byte = 0; byte < sizeof(T); byte++) {
@@ -181,99 +153,6 @@ inline std::vector<char> CreateNpyHeader(const std::vector<size_t>& shape,
 
     std::string s = ss.str();
     return std::vector<char>(s.begin(), s.end());
-}
-
-template <typename T>
-inline std::vector<char> CreateNpyHeaderV2(const std::vector<size_t>& shape) {
-    // {}     -> "()"
-    // {1}    -> "(1,)"
-    // {1, 2} -> "(1, 2)"
-    std::stringstream shape_ss;
-    if (shape.size() == 0) {
-        shape_ss << "()";
-    } else if (shape.size() == 1) {
-        shape_ss << fmt::format("({},)", shape[0]);
-    } else {
-        shape_ss << "(";
-        shape_ss << shape[0];
-        for (size_t i = 1; i < shape.size(); i++) {
-            shape_ss << ", ";
-            shape_ss << shape[i];
-        }
-        if (shape.size() == 1) {
-            shape_ss << ",";
-        }
-        shape_ss << ")";
-    }
-
-    // Pad with spaces so that preamble+dict is modulo 16 bytes.
-    // - Preamble is 10 bytes.
-    // - Dict needs to end with '\n'.
-    // - Header dict size includes the padding size and '\n'.
-    std::string dict = fmt::format(
-            "{{'descr': '{}{}{}', 'fortran_order': False, 'shape': {}, }}",
-            BigEndianChar(), TypeToChar(typeid(T)), sizeof(T), shape_ss.str());
-    size_t space_padding = 16 - (10 + dict.size()) % 16 - 1;  // {0, 1, ..., 15}
-    dict.insert(dict.end(), space_padding, ' ');
-    dict += '\n';
-
-    std::stringstream ss;
-    // "Magic" values.
-    ss << (char)0x93;
-    ss << "NUMPY";
-    // Major version of numpy format.
-    ss << (char)0x01;
-    // Minor version of numpy format.
-    ss << (char)0x00;
-    // Header dict size (full header size - 10).
-    ss << ToByteString((uint16_t)dict.size());
-    // Header dict.
-    ss << dict;
-
-    std::string s = ss.str();
-    return std::vector<char>(s.begin(), s.end());
-}
-
-template <typename T>
-inline std::vector<char> CreateNpyHeader(const std::vector<size_t>& shape) {
-    if (shape.size() == 0) {
-        return CreateNpyHeaderV2<T>(shape);
-    }
-
-    std::vector<char> dict;
-    dict += "{'descr': '";
-    dict += BigEndianChar();
-    dict += TypeToChar(typeid(T));
-    dict += std::to_string(sizeof(T));
-    dict += "', 'fortran_order': False, 'shape': (";
-    dict += std::to_string(shape[0]);
-    for (size_t i = 1; i < shape.size(); i++) {
-        dict += ", ";
-        dict += std::to_string(shape[i]);
-    }
-    if (shape.size() == 1) dict += ",";
-    dict += "), }";
-    // pad with spaces so that preamble+dict is modulo 16 bytes. preamble is 10
-    // bytes. dict needs to end with \n
-    int remainder = 16 - (10 + dict.size()) % 16;
-    dict.insert(dict.end(), remainder, ' ');
-    dict.back() = '\n';
-
-    std::vector<char> header;
-    header += (char)0x93;
-    header += "NUMPY";
-    header += (char)0x01;  // major version of numpy format
-    header += (char)0x00;  // minor version of numpy format
-    header += (uint16_t)dict.size();
-    header.insert(header.end(), dict.begin(), dict.end());
-
-    std::vector<char> header_v2 = CreateNpyHeaderV2<T>(shape);
-    if (header != header_v2) {
-        utility::LogError("HeaderV2 mismatch!");
-        utility::LogInfo("{}", header);
-        utility::LogInfo("{}", header_v2);
-    }
-    return header;
 }
 
 class NpyArray {
@@ -434,22 +313,6 @@ private:
     bool fortran_order_;
     size_t num_elements_;
 };
-
-template <typename T>
-void NpySave(std::string fname,
-             const T* data,
-             const std::vector<size_t> shape) {
-    FILE* fp = fopen(fname.c_str(), "wb");
-    std::vector<char> header = CreateNpyHeader<T>(shape);
-    size_t num_elements = std::accumulate(shape.begin(), shape.end(), 1,
-                                          std::multiplies<size_t>());
-
-    fseek(fp, 0, SEEK_SET);
-    fwrite(&header[0], sizeof(char), header.size(), fp);
-    fseek(fp, 0, SEEK_END);
-    fwrite(data, sizeof(T), num_elements, fp);
-    fclose(fp);
-}
 
 inline void NpySave(std::string fname,
                     const void* data,
