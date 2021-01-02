@@ -126,12 +126,12 @@ inline std::vector<char> CreateNpyHeaderV2(const std::vector<size_t>& shape) {
     dict_ss << "{'descr': '";
     dict_ss << BigEndianChar();
     dict_ss << TypeToChar(typeid(T));
-    dict_ss << std::to_string(sizeof(T));
+    dict_ss << sizeof(T);
     dict_ss << "', 'fortran_order': False, 'shape': (";
-    dict_ss << std::to_string(shape[0]);
+    dict_ss << shape[0];
     for (size_t i = 1; i < shape.size(); i++) {
         dict_ss << ", ";
-        dict_ss << std::to_string(shape[i]);
+        dict_ss << shape[i];
     }
     if (shape.size() == 1) {
         dict_ss << ",";
