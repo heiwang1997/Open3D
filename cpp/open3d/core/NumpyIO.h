@@ -147,6 +147,14 @@ public:
                                        Device("CPU:0"));
     }
 
+    NumpyArray(const Tensor& t)
+        : blob_(t.GetBlob()),
+          shape_(t.GetShape()),
+          type_(DtypeToChar(t.GetDtype())),
+          word_size_(t.GetDtype().ByteSize()),
+          fortran_order_(false),
+          num_elements_(t.GetShape().NumElements()) {}
+
     NumpyArray()
         : shape_(0), word_size_(0), fortran_order_(0), num_elements_(0) {}
 
@@ -221,6 +229,17 @@ public:
         }
         fclose(fp);
         return arr;
+    }
+
+    void Save(std::string file_name) const {
+        FILE* fp = fopen(file_name.c_str(), "wb");
+        std::vector<char> header = CreateNumpyHeader(shape_, GetDtype());
+        fseek(fp, 0, SEEK_SET);
+        fwrite(&header[0], sizeof(char), header.size(), fp);
+        fseek(fp, 0, SEEK_END);
+        fwrite(GetDataPtr<void>(), (size_t)GetDtype().ByteSize(),
+               (size_t)shape_.NumElements(), fp);
+        fclose(fp);
     }
 
 private:
@@ -306,18 +325,18 @@ private:
     int64_t num_elements_;
 };
 
-inline void NumpySave(std::string fname,
-                      const void* data,
-                      const SizeVector& shape,
-                      const Dtype& dtype) {
-    FILE* fp = fopen(fname.c_str(), "wb");
-    std::vector<char> header = CreateNumpyHeader(shape, dtype);
-    fseek(fp, 0, SEEK_SET);
-    fwrite(&header[0], sizeof(char), header.size(), fp);
-    fseek(fp, 0, SEEK_END);
-    fwrite(data, dtype.ByteSize(), (size_t)shape.NumElements(), fp);
-    fclose(fp);
-}
+// inline void NumpySave(std::string fname,
+//                       const void* data,
+//                       const SizeVector& shape,
+//                       const Dtype& dtype) {
+//     FILE* fp = fopen(fname.c_str(), "wb");
+//     std::vector<char> header = CreateNumpyHeader(shape, dtype);
+//     fseek(fp, 0, SEEK_SET);
+//     fwrite(&header[0], sizeof(char), header.size(), fp);
+//     fseek(fp, 0, SEEK_END);
+//     fwrite(data, dtype.ByteSize(), (size_t)shape.NumElements(), fp);
+//     fclose(fp);
+// }
 
 }  // namespace core
 }  // namespace open3d
