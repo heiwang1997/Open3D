@@ -1233,7 +1233,7 @@ Tensor Tensor::Load(const std::string& file_name) {
     SizeVector shape(np_array.GetShape().begin(), np_array.GetShape().end());
     Tensor t;
     DISPATCH_DTYPE_TO_TEMPLATE_WITH_BOOL(np_array.GetDtype(), [&]() {
-        t = Tensor(np_array.data<scalar_t>(), shape, np_array.GetDtype());
+        t = Tensor(np_array.GetDataPtr<scalar_t>(), shape, np_array.GetDtype());
     });
     return t;
 }

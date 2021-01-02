@@ -66,12 +66,12 @@ public:
     NpyArray() : shape_(0), word_size_(0), fortran_order_(0), num_vals(0) {}
 
     template <typename T>
-    T* data() {
+    T* GetDataPtr() {
         return reinterpret_cast<T*>(&(*data_holder)[0]);
     }
 
     template <typename T>
-    const T* data() const {
+    const T* GetDataPtr() const {
         return reinterpret_cast<T*>(&(*data_holder)[0]);
     }
 

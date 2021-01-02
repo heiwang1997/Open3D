@@ -164,7 +164,7 @@ NpyArray load_the_npy_file(FILE *fp) {
     parse_npy_header(fp, type, word_size, shape, fortran_order);
 
     NpyArray arr(shape, type, word_size, fortran_order);
-    size_t nread = fread(arr.data<char>(), 1, arr.NumBytes(), fp);
+    size_t nread = fread(arr.GetDataPtr<char>(), 1, arr.NumBytes(), fp);
     if (nread != arr.NumBytes()) {
         utility::LogError("load_the_npy_file: failed fread");
     }
