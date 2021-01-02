@@ -141,14 +141,23 @@ inline std::vector<char> CreateNpyHeaderV2(const std::vector<size_t>& shape) {
     dict.insert(dict.end(), remainder, ' ');
     dict.back() = '\n';
 
-    std::vector<char> header;
-    header += (char)0x93;
-    header += "NUMPY";
-    header += (char)0x01;  // major version of numpy format
-    header += (char)0x00;  // minor version of numpy format
-    header += (uint16_t)dict.size();
-    header.insert(header.end(), dict.begin(), dict.end());
-    return header;
+    std::stringstream ss;
+
+    // "Magic" values.
+    ss << (char)0x93;
+    ss << "NUMPY";
+    // Major version of numpy format.
+    ss << (char)0x01;
+    // Minor version of numpy format.
+    ss << (char)0x00;
+    // Header dict size.
+    ss << ToByteString((uint16_t)dict.size());
+    // Header dict.
+    for (const char& c : dict) {
+        ss << c;
+    }
+    std::string s = ss.str();
+    return std::vector<char>(s.begin(), s.end());
 }
 
 template <typename T>
