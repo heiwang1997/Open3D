@@ -138,7 +138,6 @@ inline std::vector<char> CreateNpyHeaderV2(const std::vector<size_t>& shape) {
     header += (char)0x00;  // minor version of numpy format
     header += (uint16_t)dict.size();
     header.insert(header.end(), dict.begin(), dict.end());
-    header += "hello";
     return header;
 }
 
