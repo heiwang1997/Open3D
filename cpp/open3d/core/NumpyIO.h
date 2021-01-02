@@ -378,13 +378,13 @@ void NpySave(std::string fname,
              const std::vector<size_t> shape) {
     FILE* fp = fopen(fname.c_str(), "wb");
     std::vector<char> header = CreateNpyHeader<T>(shape);
-    size_t nels = std::accumulate(shape.begin(), shape.end(), 1,
-                                  std::multiplies<size_t>());
+    size_t num_elements = std::accumulate(shape.begin(), shape.end(), 1,
+                                          std::multiplies<size_t>());
 
     fseek(fp, 0, SEEK_SET);
     fwrite(&header[0], sizeof(char), header.size(), fp);
     fseek(fp, 0, SEEK_END);
-    fwrite(data, sizeof(T), nels, fp);
+    fwrite(data, sizeof(T), num_elements, fp);
     fclose(fp);
 }
 
