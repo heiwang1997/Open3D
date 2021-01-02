@@ -1024,7 +1024,11 @@ def test_save_load(device):
                                dtype=o3d.core.Dtype.Float32,
                                device=device)
         o3_t.save(file_name)
+
         np_t_load = np.load(file_name)
-        o3_t_load = o3d.core.Tensor.load(file_name)
         np.testing.assert_equal(o3_t.cpu().numpy(), np_t_load)
+        print("Save OK")
+
+        o3_t_load = o3d.core.Tensor.load(file_name)
         np.testing.assert_equal(o3_t_load.cpu().numpy(), np_t_load)
+        print("Save-Load OK")

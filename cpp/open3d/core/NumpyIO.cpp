@@ -36,6 +36,8 @@
 #include <regex>
 #include <stdexcept>
 
+#include "open3d/utility/Console.h"
+
 namespace open3d {
 namespace core {
 
@@ -88,6 +90,7 @@ std::vector<char> &operator+=(std::vector<char> &lhs, const char *rhs) {
 }
 
 void parse_npy_header(FILE *fp,
+                      char &type,
                       size_t &word_size,
                       std::vector<size_t> &shape,
                       bool &fortran_order) {
@@ -138,21 +141,24 @@ void parse_npy_header(FILE *fp,
     assert(littleEndian);
     (void)littleEndian;
 
-    // char type = header[loc1+1];
+    type = header[loc1 + 1];
+    utility::LogInfo("type: {}", type);
     // assert(type == map_type(T));
 
     std::string str_ws = header.substr(loc1 + 2);
     loc2 = str_ws.find("'");
     word_size = atoi(str_ws.substr(0, loc2).c_str());
+    utility::LogInfo("word_size: {}", word_size);
 }
 
 NpyArray load_the_npy_file(FILE *fp) {
     std::vector<size_t> shape;
     size_t word_size;
     bool fortran_order;
-    parse_npy_header(fp, word_size, shape, fortran_order);
+    char type;
+    parse_npy_header(fp, type, word_size, shape, fortran_order);
 
-    NpyArray arr(shape, word_size, fortran_order);
+    NpyArray arr(shape, type, word_size, fortran_order);
     size_t nread = fread(arr.data<char>(), 1, arr.num_bytes(), fp);
     if (nread != arr.num_bytes())
         throw std::runtime_error("load_the_npy_file: failed fread");

@@ -45,9 +45,13 @@ namespace core {
 
 struct NpyArray {
     NpyArray(const std::vector<size_t>& _shape,
+             char type,
              size_t _word_size,
              bool _fortran_order)
-        : shape(_shape), word_size(_word_size), fortran_order(_fortran_order) {
+        : shape(_shape),
+          type_(type),
+          word_size(_word_size),
+          fortran_order(_fortran_order) {
         num_vals = 1;
         for (size_t i = 0; i < shape.size(); i++) num_vals *= shape[i];
         data_holder = std::make_shared<std::vector<char>>(num_vals * word_size);
@@ -75,6 +79,7 @@ struct NpyArray {
 
     std::shared_ptr<std::vector<char>> data_holder;
     std::vector<size_t> shape;
+    char type_;
     size_t word_size;
     bool fortran_order;
     size_t num_vals;
@@ -85,6 +90,7 @@ char map_type(const std::type_info& t);
 template <typename T>
 std::vector<char> create_npy_header(const std::vector<size_t>& shape);
 void parse_npy_header(FILE* fp,
+                      char& type,
                       size_t& word_size,
                       std::vector<size_t>& shape,
                       bool& fortran_order);
@@ -121,9 +127,9 @@ void npy_save(std::string fname,
         // array size
         size_t word_size;
         bool fortran_order;
-        parse_npy_header(fp, word_size, true_data_shape, fortran_order);
+        char type;  // TODO: check type consistency.
+        parse_npy_header(fp, type, word_size, true_data_shape, fortran_order);
         assert(!fortran_order);
-
         if (word_size != sizeof(T)) {
             std::cout << "libnpy error: " << fname << " has word size "
                       << word_size << " but npy_save appending data sized "
