@@ -45,7 +45,8 @@
 namespace open3d {
 namespace core {
 
-struct NpyArray {
+class NpyArray {
+public:
     NpyArray(const std::vector<size_t>& shape,
              char type,
              size_t word_size,
@@ -72,12 +73,6 @@ struct NpyArray {
     template <typename T>
     const T* data() const {
         return reinterpret_cast<T*>(&(*data_holder)[0]);
-    }
-
-    template <typename T>
-    std::vector<T> as_vec() const {
-        const T* p = data<T>();
-        return std::vector<T>(p, p + num_vals);
     }
 
     size_t NumBytes() const { return data_holder->size(); }
