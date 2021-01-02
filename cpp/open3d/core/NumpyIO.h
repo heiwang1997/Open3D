@@ -26,10 +26,6 @@
 
 #pragma once
 
-#include <algorithm>
-#include <cassert>
-#include <iomanip>
-#include <iostream>
 #include <memory>
 #include <numeric>
 #include <regex>
@@ -238,7 +234,9 @@ private:
             utility::LogError("ParseNumpyHeader: failed fread");
         }
         std::string header = fgets(buffer, 256, fp);
-        assert(header[header.size() - 1] == '\n');
+        if (header[header.size() - 1] != '\n') {
+            utility::LogError("ParseNumpyHeader: the last char must be '\n'");
+        }
 
         size_t loc1, loc2;
 
@@ -282,10 +280,11 @@ private:
         }
 
         loc1 += 9;
-        bool littleEndian =
+        bool little_endian =
                 (header[loc1] == '<' || header[loc1] == '|' ? true : false);
-        assert(littleEndian);
-        (void)littleEndian;
+        if (!little_endian) {
+            utility::LogError("Only big endian is supported.");
+        }
 
         type = header[loc1 + 1];
 
