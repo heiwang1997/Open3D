@@ -28,14 +28,19 @@
 
 #include <stdint.h>
 
+#include <algorithm>
 #include <cassert>
+#include <complex>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <iomanip>
 #include <iostream>
 #include <map>
 #include <memory>
 #include <numeric>
+#include <regex>
 #include <sstream>
-#include <stdexcept>
 #include <string>
 #include <typeinfo>
 #include <vector>
@@ -78,12 +83,131 @@ inline char MapType(const std::type_info& t) {
 }
 
 template <typename T>
-std::vector<char> CreateNpyHeader(const std::vector<size_t>& shape);
-void ParseNpyHeader(FILE* fp,
-                    char& type,
-                    size_t& word_size,
-                    std::vector<size_t>& shape,
-                    bool& fortran_order);
+inline std::vector<char>& operator+=(std::vector<char>& lhs, const T rhs) {
+    // Write in little endian
+    for (size_t byte = 0; byte < sizeof(T); byte++) {
+        char val = *((char*)&rhs + byte);
+        lhs.push_back(val);
+    }
+    return lhs;
+}
+
+template <>
+inline std::vector<char>& operator+=(std::vector<char>& lhs,
+                                     const std::string rhs) {
+    lhs.insert(lhs.end(), rhs.begin(), rhs.end());
+    return lhs;
+}
+
+template <>
+inline std::vector<char>& operator+=(std::vector<char>& lhs, const char* rhs) {
+    // write in little endian
+    size_t len = strlen(rhs);
+    lhs.reserve(len);
+    for (size_t byte = 0; byte < len; byte++) {
+        lhs.push_back(rhs[byte]);
+    }
+    return lhs;
+}
+
+template <typename T>
+inline std::vector<char> CreateNpyHeader(const std::vector<size_t>& shape) {
+    std::vector<char> dict;
+    dict += "{'descr': '";
+    dict += BigEndianTest();
+    dict += MapType(typeid(T));
+    dict += std::to_string(sizeof(T));
+    dict += "', 'fortran_order': False, 'shape': (";
+    dict += std::to_string(shape[0]);
+    for (size_t i = 1; i < shape.size(); i++) {
+        dict += ", ";
+        dict += std::to_string(shape[i]);
+    }
+    if (shape.size() == 1) dict += ",";
+    dict += "), }";
+    // pad with spaces so that preamble+dict is modulo 16 bytes. preamble is 10
+    // bytes. dict needs to end with \n
+    int remainder = 16 - (10 + dict.size()) % 16;
+    dict.insert(dict.end(), remainder, ' ');
+    dict.back() = '\n';
+
+    std::vector<char> header;
+    header += (char)0x93;
+    header += "NUMPY";
+    header += (char)0x01;  // major version of numpy format
+    header += (char)0x00;  // minor version of numpy format
+    header += (uint16_t)dict.size();
+    header.insert(header.end(), dict.begin(), dict.end());
+
+    return header;
+}
+
+inline void ParseNpyHeader(FILE* fp,
+                           char& type,
+                           size_t& word_size,
+                           std::vector<size_t>& shape,
+                           bool& fortran_order) {
+    char buffer[256];
+    size_t res = fread(buffer, sizeof(char), 11, fp);
+    if (res != 11) {
+        utility::LogError("ParseNpyHeader: failed fread");
+    }
+    std::string header = fgets(buffer, 256, fp);
+    assert(header[header.size() - 1] == '\n');
+
+    size_t loc1, loc2;
+
+    // fortran order
+    loc1 = header.find("fortran_order");
+    if (loc1 == std::string::npos) {
+        utility::LogError(
+                "ParseNpyHeader: failed to find header keyword: "
+                "'fortran_order'");
+    }
+
+    loc1 += 16;
+    fortran_order = (header.substr(loc1, 4) == "True" ? true : false);
+
+    // shape
+    loc1 = header.find("(");
+    loc2 = header.find(")");
+    if (loc1 == std::string::npos || loc2 == std::string::npos) {
+        utility::LogError(
+                "ParseNpyHeader: failed to find header keyword: '(' or ')'");
+    }
+
+    std::regex num_regex("[0-9][0-9]*");
+    std::smatch sm;
+    shape.clear();
+
+    std::string str_shape = header.substr(loc1 + 1, loc2 - loc1 - 1);
+    while (std::regex_search(str_shape, sm, num_regex)) {
+        shape.push_back(std::stoi(sm[0].str()));
+        str_shape = sm.suffix().str();
+    }
+
+    // endian, word size, data type
+    // byte order code | stands for not applicable.
+    // not sure when this applies except for byte array
+    loc1 = header.find("descr");
+    if (loc1 == std::string::npos) {
+        utility::LogError(
+                "ParseNpyHeader: failed to find header keyword: 'descr'");
+    }
+
+    loc1 += 9;
+    bool littleEndian =
+            (header[loc1] == '<' || header[loc1] == '|' ? true : false);
+    assert(littleEndian);
+    (void)littleEndian;
+
+    type = header[loc1 + 1];
+    // assert(type == MapType(T));
+
+    std::string str_ws = header.substr(loc1 + 2);
+    loc2 = str_ws.find("'");
+    word_size = atoi(str_ws.substr(0, loc2).c_str());
+}
 
 class NpyArray {
 public:
@@ -177,34 +301,6 @@ private:
 };
 
 template <typename T>
-inline std::vector<char>& operator+=(std::vector<char>& lhs, const T rhs) {
-    // Write in little endian
-    for (size_t byte = 0; byte < sizeof(T); byte++) {
-        char val = *((char*)&rhs + byte);
-        lhs.push_back(val);
-    }
-    return lhs;
-}
-
-template <>
-inline std::vector<char>& operator+=(std::vector<char>& lhs,
-                                     const std::string rhs) {
-    lhs.insert(lhs.end(), rhs.begin(), rhs.end());
-    return lhs;
-}
-
-template <>
-inline std::vector<char>& operator+=(std::vector<char>& lhs, const char* rhs) {
-    // write in little endian
-    size_t len = strlen(rhs);
-    lhs.reserve(len);
-    for (size_t byte = 0; byte < len; byte++) {
-        lhs.push_back(rhs[byte]);
-    }
-    return lhs;
-}
-
-template <typename T>
 void NpySave(std::string fname,
              const T* data,
              const std::vector<size_t> shape) {
@@ -227,38 +323,6 @@ void NpySave(std::string fname,
     std::vector<size_t> shape;
     shape.push_back(data.size());
     NpySave(fname, &data[0], shape, mode);
-}
-
-template <typename T>
-std::vector<char> CreateNpyHeader(const std::vector<size_t>& shape) {
-    std::vector<char> dict;
-    dict += "{'descr': '";
-    dict += BigEndianTest();
-    dict += MapType(typeid(T));
-    dict += std::to_string(sizeof(T));
-    dict += "', 'fortran_order': False, 'shape': (";
-    dict += std::to_string(shape[0]);
-    for (size_t i = 1; i < shape.size(); i++) {
-        dict += ", ";
-        dict += std::to_string(shape[i]);
-    }
-    if (shape.size() == 1) dict += ",";
-    dict += "), }";
-    // pad with spaces so that preamble+dict is modulo 16 bytes. preamble is 10
-    // bytes. dict needs to end with \n
-    int remainder = 16 - (10 + dict.size()) % 16;
-    dict.insert(dict.end(), remainder, ' ');
-    dict.back() = '\n';
-
-    std::vector<char> header;
-    header += (char)0x93;
-    header += "NUMPY";
-    header += (char)0x01;  // major version of numpy format
-    header += (char)0x00;  // minor version of numpy format
-    header += (uint16_t)dict.size();
-    header.insert(header.end(), dict.begin(), dict.end());
-
-    return header;
 }
 
 }  // namespace core
