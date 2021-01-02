@@ -1229,7 +1229,9 @@ void Tensor::Save(const std::string& file_name) const {
 }
 
 Tensor Tensor::Load(const std::string& file_name) {
-    utility::LogError("Unimplemented load.");
+    NpyArray np_array = npy_load(file_name);
+    (void)np_array;
+    utility::LogError("Load unimplemented");
 }
 
 bool Tensor::AllClose(const Tensor& other, double rtol, double atol) const {
