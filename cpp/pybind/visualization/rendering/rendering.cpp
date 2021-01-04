@@ -158,6 +158,10 @@ void pybind_rendering_classes(py::module &m) {
                  "Sets the camera projection via intrinsics matrix. "
                  "set_projection(intrinsics, near_place, far_plane, "
                  "image_width, image_height)")
+            .def("get_position", &Camera::GetPosition, "Get position")
+            .def("get_forward_vector", &Camera::GetForwardVector, "Get forward vector")
+            .def("get_left_vector", &Camera::GetLeftVector, "Get left vector")
+            .def("get_up_vector", &Camera::GetUpVector, "Get up vector")
             .def("look_at", &Camera::LookAt,
                  "Sets the position and orientation of the camera: "
                  "look_at(center, eye, up)");
