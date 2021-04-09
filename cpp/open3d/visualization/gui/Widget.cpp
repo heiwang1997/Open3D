@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // The MIT License (MIT)
 //
-// Copyright (c) 2018 www.open3d.org
+// Copyright (c) 2021 www.open3d.org
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -88,7 +88,8 @@ bool Widget::IsEnabled() const { return impl_->is_enabled_; }
 
 void Widget::SetEnabled(bool enabled) { impl_->is_enabled_ = enabled; }
 
-Size Widget::CalcPreferredSize(const Theme&) const {
+Size Widget::CalcPreferredSize(const Theme&,
+                               const Constraints& constraints) const {
     return Size(DIM_GROW, DIM_GROW);
 }
 

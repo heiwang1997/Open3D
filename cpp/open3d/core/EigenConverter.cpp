@@ -35,6 +35,52 @@ namespace core {
 namespace eigen_converter {
 
 template <typename T>
+static Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+TensorToEigenMatrix(const core::Tensor &tensor) {
+    static_assert(std::is_same<T, double>::value ||
+                          std::is_same<T, float>::value ||
+                          std::is_same<T, int>::value,
+                  "Only supports double, float and int (MatrixXd, MatrixXf and "
+                  "MatrixXi).");
+    core::Dtype dtype = core::Dtype::FromType<T>();
+
+    core::SizeVector dim = tensor.GetShape();
+    if (dim.size() != 2) {
+        utility::LogError(
+                " [TensorToEigenMatrix]: Number of dimensions supported = 2, "
+                "but got {}.",
+                dim.size());
+    }
+
+    core::Tensor tensor_cpu_contiguous =
+            tensor.Contiguous().To(core::Device("CPU:0"), dtype);
+    T *data_ptr = tensor_cpu_contiguous.GetDataPtr<T>();
+
+    Eigen::Map<
+            Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>
+            eigen_matrix(data_ptr, dim[0], dim[1]);
+
+    Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+            eigen_matrix_copy(eigen_matrix);
+    return eigen_matrix_copy;
+}
+
+Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+TensorToEigenMatrixXd(const core::Tensor &tensor) {
+    return TensorToEigenMatrix<double>(tensor);
+}
+
+Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+TensorToEigenMatrixXf(const core::Tensor &tensor) {
+    return TensorToEigenMatrix<float>(tensor);
+}
+
+Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+TensorToEigenMatrixXi(const core::Tensor &tensor) {
+    return TensorToEigenMatrix<int>(tensor);
+}
+
+template <typename T>
 static std::vector<Eigen::Matrix<T, 3, 1>> TensorToEigenVector3xVector(
         const core::Tensor &tensor) {
     static_assert(std::is_same<T, double>::value || std::is_same<T, int>::value,
@@ -55,7 +101,7 @@ static std::vector<Eigen::Matrix<T, 3, 1>> TensorToEigenVector3xVector(
     // safe to write directly into std vector memory, see:
     // https://eigen.tuxfamily.org/dox/group__TopicStlContainers.html.
     std::vector<Eigen::Matrix<T, 3, 1>> eigen_vector(tensor.GetLength());
-    core::Tensor t = tensor.Contiguous().To(dtype, /*copy=*/false);
+    core::Tensor t = tensor.Contiguous().To(dtype);
     MemoryManager::MemcpyToHost(eigen_vector.data(), t.GetDataPtr(),
                                 t.GetDevice(),
                                 t.GetDtype().ByteSize() * t.NumElements());
@@ -91,11 +137,7 @@ static core::Tensor EigenVector3xVectorToTensor(
     });
 
     // Copy Tensor to device if necessary.
-    if (device.GetType() == core::Device::DeviceType::CPU) {
-        return tensor_cpu;
-    } else {
-        return tensor_cpu.Copy(device);
-    }
+    return tensor_cpu.To(device);
 }
 
 std::vector<Eigen::Vector3d> TensorToEigenVector3dVector(

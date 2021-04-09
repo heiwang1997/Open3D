@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // The MIT License (MIT)
 //
-// Copyright (c) 2018 www.open3d.org
+// Copyright (c) 2021 www.open3d.org
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -91,7 +91,12 @@ public:
     virtual void SetEnabled(bool enabled);
 
     static constexpr int DIM_GROW = 10000;
-    virtual Size CalcPreferredSize(const Theme& theme) const;
+    struct Constraints {
+        int width = DIM_GROW;
+        int height = DIM_GROW;
+    };
+    virtual Size CalcPreferredSize(const Theme& theme,
+                                   const Constraints& constraints) const;
 
     virtual void Layout(const Theme& theme);
 

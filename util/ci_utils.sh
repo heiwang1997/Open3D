@@ -37,14 +37,14 @@ PIP_VER="20.2.4"
 WHEEL_VER="0.35.1"
 STOOLS_VER="50.3.2"
 PYTEST_VER="6.0.1"
-SCIPY_VER="1.4.1"
+SCIPY_VER="1.5.4"
 YAPF_VER="0.30.0"
 
 # Documentation
 SPHINX_VER=3.1.2
 SPHINX_RTD_VER=0.5.0
 NBSPHINX_VER=0.7.1
-PILLOW_VER=7.2.0
+MATPLOTLIB_VER=3.3.3
 
 OPEN3D_INSTALL_DIR=~/open3d_install
 OPEN3D_SOURCE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. >/dev/null 2>&1 && pwd)"
@@ -56,13 +56,7 @@ install_cuda_toolkit() {
     $SUDO apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub
     $SUDO apt-add-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64 /"
     $SUDO apt-get install --yes --no-install-recommends \
-        "cuda-minimal-build-${CUDA_VERSION[0]}" \
-        "cuda-cusolver-dev-${CUDA_VERSION[0]}" \
-        "cuda-cusparse-dev-${CUDA_VERSION[0]}" \
-        "cuda-curand-dev-${CUDA_VERSION[0]}" \
-        "cuda-cufft-dev-${CUDA_VERSION[0]}" \
-        "cuda-nvrtc-dev-${CUDA_VERSION[0]}" \
-        "cuda-nvtx-${CUDA_VERSION[0]}" \
+        "cuda-toolkit-${CUDA_VERSION[0]}" \
         libcublas-dev
     if [ "${CUDA_VERSION[1]}" == "10.1" ]; then
         echo "CUDA 10.1 needs CUBLAS 10.2. Symlinks ensure this is found by cmake"
@@ -203,6 +197,9 @@ install_azure_kinect_dependencies() {
 
 build_all() {
 
+    echo "Using cmake: $(which cmake)"
+    cmake --version
+
     mkdir -p build
     cd build
 
@@ -225,7 +222,7 @@ build_all() {
     echo Running cmake "${cmakeOptions[@]}" ..
     cmake "${cmakeOptions[@]}" ..
     echo
-    echo "build & install Open3D..."
+    echo "Build & install Open3D..."
     make VERBOSE=1 -j"$NPROC"
     make install -j"$NPROC"
     make VERBOSE=1 install-pip-package -j"$NPROC"
@@ -322,9 +319,14 @@ build_pip_conda_package() {
 test_wheel() {
     wheel_path="$1"
     python -m venv open3d_test.venv
+    # shellcheck disable=SC1091
     source open3d_test.venv/bin/activate
     python -m pip install --upgrade pip=="$PIP_VER" wheel=="$WHEEL_VER" \
         setuptools=="$STOOLS_VER"
+    echo "Using python: $(which python)"
+    python --version
+    echo -n "Using pip: "
+    python -m pip --version
     echo "Installing Open3D wheel $wheel_path in virtual environment..."
     python -m pip install "$wheel_path"
     python -c "import open3d; print('Installed:', open3d)"
@@ -338,8 +340,16 @@ test_wheel() {
     #     find "$DLL_PATH"/cpu/ -type f -execdir otool -L {} \;
     # fi
     echo
+    # Get 3DML requirements from github if Open3D-ML repo is not available
+    set +u
+    OPEN3D_ML_ROOT=${OPEN3D_ML_ROOT:-"https://raw.githubusercontent.com/intel-isl/Open3D-ML/master"}
+    set -u
     if [ "$BUILD_PYTORCH_OPS" == ON ]; then
-        python -m pip install -r "$OPEN3D_ML_ROOT/requirements-torch.txt"
+        if [ "$BUILD_CUDA_MODULE" == ON ]; then
+            python -m pip install -r "$OPEN3D_ML_ROOT/requirements-torch-cuda.txt"
+        else
+            python -m pip install -r "$OPEN3D_ML_ROOT/requirements-torch.txt"
+        fi
         python -c \
             "import open3d.ml.torch; print('PyTorch Ops library loaded:', open3d.ml.torch._loaded)"
     fi
@@ -354,11 +364,12 @@ test_wheel() {
         echo "importing in the normal order"
         python -c "import open3d.ml.torch as o3d; import tensorflow as tf"
     fi
-    deactivate
+    deactivate open3d_test.venv # argument prevents unbound variable error
 }
 
 # Run in virtual environment
 run_python_tests() {
+    # shellcheck disable=SC1091
     source open3d_test.venv/bin/activate
     python -m pip install -U pytest=="$PYTEST_VER"
     python -m pip install -U scipy=="$SCIPY_VER"
@@ -368,7 +379,7 @@ run_python_tests() {
         pytest_args+=(--ignore "$OPEN3D_SOURCE_ROOT"/python/test/ml_ops/)
     fi
     python -m pytest "${pytest_args[@]}"
-    deactivate
+    deactivate open3d_test.venv # argument prevents unbound variable error
 }
 
 # Use: run_unit_tests
@@ -382,17 +393,20 @@ run_cpp_unit_tests() {
 # test_cpp_example runExample
 # Need variable OPEN3D_INSTALL_DIR
 test_cpp_example() {
-
-    cd ../docs/_static/C++
-    mkdir -p build
+    # Now I am in Open3D/build/
+    cd ..
+    git clone https://github.com/intel-isl/open3d-cmake-find-package.git
+    cd open3d-cmake-find-package
+    mkdir build
     cd build
     cmake -DCMAKE_INSTALL_PREFIX=${OPEN3D_INSTALL_DIR} ..
     make -j"$NPROC" VERBOSE=1
     runExample="$1"
     if [ "$runExample" == ON ]; then
-        ./TestVisualizer
+        ./Draw --skip-for-unit-test
     fi
-    cd ../../../../build
+    # Now I am in Open3D/open3d-cmake-find-package/build/
+    cd ../../build
 }
 
 # Install dependencies needed for building documentation (on Ubuntu 18.04)
@@ -415,8 +429,13 @@ install_docs_dependencies() {
     echo Install Python dependencies for building docs
     which python
     python -V
-    python -m pip install -U -q "wheel==$WHEEL_VER" "pip==$PIP_VER" "Pillow==$PILLOW_VER" \
-        "sphinx==$SPHINX_VER" "sphinx-rtd-theme==$SPHINX_RTD_VER" "nbsphinx==$NBSPHINX_VER"
+    python -m pip install -U -q \
+        "wheel==$WHEEL_VER" \
+        "pip==$PIP_VER" \
+        "matplotlib==$MATPLOTLIB_VER" \
+        "sphinx==$SPHINX_VER" \
+        "sphinx-rtd-theme==$SPHINX_RTD_VER" \
+        "nbsphinx==$NBSPHINX_VER"
     # m2r needs a patch for sphinx 3
     # https://github.com/sphinx-doc/sphinx/issues/7420
     python -m pip install -U -q "git+https://github.com/intel-isl/m2r@dev#egg=m2r"
@@ -493,4 +512,13 @@ build_docs() {
     cd ../docs # To Open3D/docs
     python make_docs.py $DOC_ARGS --pyapi_rst=always --execute_notebooks=never --sphinx --doxygen
     set +x # Echo commands off
+}
+
+maximize_ubuntu_github_actions_build_space() {
+    df -h
+    $SUDO rm -rf /usr/share/dotnet
+    $SUDO rm -rf /usr/local/lib/android
+    $SUDO rm -rf /opt/ghc
+    $SUDO rm -rf "$AGENT_TOOLSDIRECTORY"
+    df -h
 }

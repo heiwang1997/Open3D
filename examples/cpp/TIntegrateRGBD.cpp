@@ -43,6 +43,7 @@ void PrintHelp() {
     utility::LogInfo("     --max_depth [=3.0]");
     utility::LogInfo("     --sdf_trunc [=0.04]");
     utility::LogInfo("     --device [CPU:0]");
+    utility::LogInfo("     --raycast");
     utility::LogInfo("     --mesh");
     utility::LogInfo("     --pointcloud");
     // clang-format on
@@ -103,14 +104,16 @@ int main(int argc, char** argv) {
     int block_count =
             utility::GetProgramOptionAsInt(argc, argv, "--block_count", 1000);
 
-    double voxel_size = utility::GetProgramOptionAsDouble(
-            argc, argv, "--voxel_size", 3.0 / 512);
-    double depth_scale = utility::GetProgramOptionAsDouble(
-            argc, argv, "--depth_scale", 1000.0);
-    double max_depth =
-            utility::GetProgramOptionAsDouble(argc, argv, "--max_depth", 3.0);
-    double sdf_trunc =
-            utility::GetProgramOptionAsDouble(argc, argv, "--sdf_trunc", 0.04);
+    float voxel_size = static_cast<float>(utility::GetProgramOptionAsDouble(
+            argc, argv, "--voxel_size", 3.f / 512.f));
+    float depth_scale = static_cast<float>(utility::GetProgramOptionAsDouble(
+            argc, argv, "--depth_scale", 1000.f));
+    float max_depth = static_cast<float>(
+            utility::GetProgramOptionAsDouble(argc, argv, "--max_depth", 3.f));
+    float sdf_trunc = static_cast<float>(utility::GetProgramOptionAsDouble(
+            argc, argv, "--sdf_trunc", 0.04f));
+
+    bool enable_raycast = utility::ProgramOptionExists(argc, argv, "--raycast");
 
     // Device
     std::string device_code = "CPU:0";
@@ -122,35 +125,89 @@ int main(int argc, char** argv) {
     t::geometry::TSDFVoxelGrid voxel_grid({{"tsdf", core::Dtype::Float32},
                                            {"weight", core::Dtype::UInt16},
                                            {"color", core::Dtype::UInt16}},
-                                          static_cast<float>(voxel_size),
-                                          static_cast<float>(sdf_trunc), 16,
+                                          voxel_size, sdf_trunc, 16,
                                           block_count, device);
 
+    double time_total = 0;
+    double time_int = 0;
+    double time_raycasting = 0;
     for (size_t i = 0; i < trajectory->parameters_.size(); ++i) {
-        // Load image
-        std::shared_ptr<geometry::Image> depth_legacy =
-                io::CreateImageFromFile(depth_filenames[i]);
-        std::shared_ptr<geometry::Image> color_legacy =
-                io::CreateImageFromFile(color_filenames[i]);
+        utility::Timer timer;
+        timer.Start();
 
+        // Load image
+        utility::Timer timer_io;
+        timer_io.Start();
         t::geometry::Image depth =
-                t::geometry::Image::FromLegacyImage(*depth_legacy, device);
+                (*t::io::CreateImageFromFile(depth_filenames[i]));
         t::geometry::Image color =
-                t::geometry::Image::FromLegacyImage(*color_legacy, device);
+                (*t::io::CreateImageFromFile(color_filenames[i]));
+        timer_io.Stop();
+        utility::LogInfo("IO takes {}", timer_io.GetDuration());
+
+        timer_io.Start();
+        depth = depth.To(device);
+        color = color.To(device);
+        timer_io.Stop();
+        utility::LogInfo("Conversion takes {}", timer_io.GetDuration());
 
         Eigen::Matrix4f extrinsic =
                 trajectory->parameters_[i].extrinsic_.cast<float>();
         Tensor extrinsic_t =
-                core::eigen_converter::EigenMatrixToTensor(extrinsic).Copy(
+                core::eigen_converter::EigenMatrixToTensor(extrinsic).To(
                         device);
 
-        utility::Timer timer;
-        timer.Start();
+        utility::Timer int_timer;
+        int_timer.Start();
         voxel_grid.Integrate(depth, color, intrinsic_t, extrinsic_t,
                              depth_scale, max_depth);
+        int_timer.Stop();
+        utility::LogInfo("{}: Integration takes {}", i,
+                         int_timer.GetDuration());
+        time_int += int_timer.GetDuration();
+
+        if (enable_raycast) {
+            core::Tensor vertex_map, color_map, normal_map;
+
+            utility::Timer ray_timer;
+            ray_timer.Start();
+
+            float scale = 4.0;
+            Tensor intrinsic_t_down = intrinsic_t / scale;
+            intrinsic_t_down[2][2] = 1.0;
+            std::tie(vertex_map, color_map, normal_map) = voxel_grid.RayCast(
+                    intrinsic_t_down, extrinsic_t, depth.GetCols() / scale,
+                    depth.GetRows() / scale, 80, 0.1, 3.0,
+                    std::min(i * 1.0f, 3.0f));
+            ray_timer.Stop();
+            utility::LogInfo("{}: Raycast takes {}", i,
+                             ray_timer.GetDuration());
+            time_raycasting += ray_timer.GetDuration();
+
+            if (i % 500 == 0) {
+                t::geometry::Image vertex(vertex_map);
+                visualization::DrawGeometries(
+                        {std::make_shared<open3d::geometry::Image>(
+                                vertex.ToLegacyImage())});
+                t::geometry::Image normal(normal_map);
+                visualization::DrawGeometries(
+                        {std::make_shared<open3d::geometry::Image>(
+                                normal.ToLegacyImage())});
+                t::geometry::Image color(color_map);
+                visualization::DrawGeometries(
+                        {std::make_shared<open3d::geometry::Image>(
+                                color.ToLegacyImage())});
+            }
+        }
+
         timer.Stop();
-        utility::LogInfo("{}: Integration takes {}", i, timer.GetDuration());
+        utility::LogInfo("{}: Per iteration takes {}", i, timer.GetDuration());
+        time_total += timer.GetDuration();
     }
+
+    size_t n = trajectory->parameters_.size();
+    utility::LogInfo("per frame: {}, ray cating: {}, integration: {}",
+                     time_total / n, time_raycasting / n, time_int / n);
 
     if (utility::ProgramOptionExists(argc, argv, "--mesh")) {
         auto mesh = voxel_grid.ExtractSurfaceMesh();

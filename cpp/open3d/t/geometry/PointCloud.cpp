@@ -34,9 +34,9 @@
 #include "open3d/core/ShapeUtil.h"
 #include "open3d/core/Tensor.h"
 #include "open3d/core/hashmap/Hashmap.h"
-#include "open3d/core/kernel/Kernel.h"
 #include "open3d/core/linalg/Matmul.h"
 #include "open3d/t/geometry/TensorMap.h"
+#include "open3d/t/geometry/kernel/PointCloud.h"
 
 namespace open3d {
 namespace t {
@@ -57,10 +57,12 @@ PointCloud::PointCloud(const core::Tensor &points)
 
 PointCloud::PointCloud(const std::unordered_map<std::string, core::Tensor>
                                &map_keys_to_tensors)
-    : PointCloud(map_keys_to_tensors.at("points").GetDevice()) {
+    : Geometry(Geometry::GeometryType::PointCloud, 3),
+      point_attr_(TensorMap("points")) {
     if (map_keys_to_tensors.count("points") == 0) {
         utility::LogError("\"points\" attribute must be specified.");
     }
+    device_ = map_keys_to_tensors.at("points").GetDevice();
     map_keys_to_tensors.at("points").AssertShapeCompatible(
             {utility::nullopt, 3});
     point_attr_ = TensorMap("points", map_keys_to_tensors.begin(),
@@ -73,15 +75,18 @@ core::Tensor PointCloud::GetMaxBound() const { return GetPoints().Max({0}); }
 
 core::Tensor PointCloud::GetCenter() const { return GetPoints().Mean({0}); }
 
-PointCloud PointCloud::Copy(const core::Device device) const {
+PointCloud PointCloud::To(const core::Device &device, bool copy) const {
+    if (!copy && GetDevice() == device) {
+        return *this;
+    }
     PointCloud pcd(device);
-    for (auto &value : point_attr_) {
-        pcd.SetPointAttr(value.first, value.second.Copy(device));
+    for (auto &kv : point_attr_) {
+        pcd.SetPointAttr(kv.first, kv.second.To(device, /*copy=*/true));
     }
     return pcd;
 }
 
-PointCloud PointCloud::Copy() const { return Copy(GetDevice()); }
+PointCloud PointCloud::Clone() const { return To(GetDevice(), /*copy=*/true); }
 
 PointCloud &PointCloud::Transform(const core::Tensor &transformation) {
     transformation.AssertShape({4, 4});
@@ -145,37 +150,72 @@ PointCloud &PointCloud::Rotate(const core::Tensor &R,
     return *this;
 }
 
+PointCloud PointCloud::VoxelDownSample(
+        double voxel_size, const core::HashmapBackend &backend) const {
+    if (voxel_size <= 0) {
+        utility::LogError("voxel_size must be positive.");
+    }
+    core::Tensor points_voxeld = GetPoints() / voxel_size;
+    core::Tensor points_voxeli = points_voxeld.Floor().To(core::Dtype::Int64);
+
+    core::Hashmap points_voxeli_hashmap(points_voxeli.GetLength(),
+                                        core::Dtype::Int64, core::Dtype::Int32,
+                                        {3}, {1}, device_, backend);
+
+    core::Tensor addrs, masks;
+    points_voxeli_hashmap.Activate(points_voxeli, addrs, masks);
+
+    PointCloud pcd_down(GetPoints().GetDevice());
+    for (auto &kv : point_attr_) {
+        if (kv.first == "points") {
+            pcd_down.SetPointAttr(kv.first, points_voxeli.IndexGet({masks}).To(
+                                                    GetPoints().GetDtype()) *
+                                                    voxel_size);
+        } else {
+            pcd_down.SetPointAttr(kv.first, kv.second.IndexGet({masks}));
+        }
+    }
+
+    return pcd_down;
+}
+
 PointCloud PointCloud::CreateFromDepthImage(const Image &depth,
                                             const core::Tensor &intrinsics,
                                             const core::Tensor &extrinsics,
-                                            double depth_scale,
-                                            double depth_max,
+                                            float depth_scale,
+                                            float depth_max,
                                             int stride) {
-    depth.AsTensor().AssertDtype(core::Dtype::UInt16);
-
-    core::Device device = depth.GetDevice();
-    std::unordered_map<std::string, core::Tensor> srcs = {
-            {"depth", depth.AsTensor()},
-            {"intrinsics", intrinsics.Copy(device)},
-            {"extrinsics", extrinsics.Copy(device)},
-            {"depth_scale",
-             core::Tensor(std::vector<float>{static_cast<float>(depth_scale)},
-                          {}, core::Dtype::Float32, device)},
-            {"depth_max",
-             core::Tensor(std::vector<float>{static_cast<float>(depth_max)}, {},
-                          core::Dtype::Float32, device)},
-            {"stride", core::Tensor(std::vector<int64_t>{stride}, {},
-                                    core::Dtype::Int64, device)}};
-    std::unordered_map<std::string, core::Tensor> dsts;
-
-    core::kernel::GeneralEW(srcs, dsts,
-                            core::kernel::GeneralEWOpCode::Unproject);
-    if (dsts.count("points") == 0) {
+    core::Dtype dtype = depth.AsTensor().GetDtype();
+    if (dtype != core::Dtype::UInt16 && dtype != core::Dtype::Float32) {
         utility::LogError(
-                "[PointCloud] unprojection launch failed, vertex map expected "
-                "to return.");
+                "Unsupported dtype for CreateFromDepthImage, expected UInt16 "
+                "or Float32, but got {}.",
+                dtype.ToString());
     }
-    return PointCloud(dsts.at("points"));
+
+    core::Tensor points;
+    kernel::pointcloud::Unproject(depth.AsTensor(), utility::nullopt, points,
+                                  utility::nullopt, intrinsics, extrinsics,
+                                  depth_scale, depth_max, stride);
+    return PointCloud(points);
+}
+
+PointCloud PointCloud::CreateFromRGBDImage(const RGBDImage &rgbd_image,
+                                           const core::Tensor &intrinsics,
+                                           const core::Tensor &extrinsics,
+                                           float depth_scale,
+                                           float depth_max,
+                                           int stride) {
+    rgbd_image.depth_.AsTensor().AssertDtype(core::Dtype::UInt16);
+    core::Tensor image_colors =
+            rgbd_image.color_.To(core::Dtype::Float32, /*copy=*/false)
+                    .AsTensor();
+
+    core::Tensor points, colors;
+    kernel::pointcloud::Unproject(rgbd_image.depth_.AsTensor(), image_colors,
+                                  points, colors, intrinsics, extrinsics,
+                                  depth_scale, depth_max, stride);
+    return PointCloud({{"points", points}, {"colors", colors}});
 }
 
 PointCloud PointCloud::FromLegacyPointCloud(

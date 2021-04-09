@@ -24,6 +24,8 @@
 // IN THE SOFTWARE.
 // ----------------------------------------------------------------------------
 
+#pragma once
+
 #include "open3d/core/Dtype.h"
 #include "open3d/core/Tensor.h"
 #include "open3d/core/hashmap/HashmapBuffer.h"
@@ -31,38 +33,24 @@
 namespace open3d {
 namespace core {
 
-// Forward declaration of device-dependent classes
-class DefaultHash;
-class DefaultKeyEq;
-
-template <typename Hash, typename KeyEq>
 class DeviceHashmap;
-typedef DeviceHashmap<DefaultHash, DefaultKeyEq> DefaultDeviceHashmap;
+
+enum class HashmapBackend { Slab, StdGPU, TBB, Default };
 
 class Hashmap {
 public:
-    static constexpr int64_t kDefaultElemsPerBucket = 4;
-
-    /// Constructor for primitive and custom types, supporting element shapes.
-    /// Example 1:
+    /// Constructor for primitive types, supporting element shapes.
+    /// Example:
     /// Key is int<3> coordinate:
-    /// # Option 1:
     /// - dtype_key = Dtype::Int32
     /// - element_shape_key = {3}
-    /// # Option 2:
-    /// - dtype_key = Dtype(DtypeCode::Object, 3 * Dtype::Int32.ByteSize(),
-    /// "int3")
-    /// - element_shape_key = {1}
-    /// Example 2:
-    /// Key is struct Pt {int x; int y; int z;}
-    /// - dtype_key = Dtype(DtypeCode::Object, sizeof(Pt), "pt")
-    /// - element_shape_key = {1}
     Hashmap(int64_t init_capacity,
             const Dtype& dtype_key,
             const Dtype& dtype_value,
             const SizeVector& element_shape_key,
             const SizeVector& element_shape_value,
-            const Device& device);
+            const Device& device,
+            const HashmapBackend& backend = HashmapBackend::Default);
 
     ~Hashmap(){};
 
@@ -112,11 +100,12 @@ public:
     /// Parallel collect all iterators in the hash table
     /// Return \addrs: internal indices that can be directly used for advanced
     /// indexing in Tensor key/value buffers.
-    void GetActiveIndices(Tensor& output_indices);
+    void GetActiveIndices(Tensor& output_indices) const;
 
-    Hashmap Copy(const Device& device);
-    Hashmap CPU();
-    Hashmap CUDA(int device_id = 0);
+    Hashmap Clone() const;
+    Hashmap To(const Device& device, bool copy = false) const;
+    Hashmap CPU() const;
+    Hashmap CUDA(int device_id = 0) const;
 
     int64_t Size() const;
 
@@ -126,11 +115,11 @@ public:
     int64_t GetKeyBytesize() const;
     int64_t GetValueBytesize() const;
 
-    Tensor& GetKeyBuffer();
-    Tensor& GetValueBuffer();
+    Tensor& GetKeyBuffer() const;
+    Tensor& GetValueBuffer() const;
 
-    Tensor GetKeyTensor();
-    Tensor GetValueTensor();
+    Tensor GetKeyTensor() const;
+    Tensor GetValueTensor() const;
 
     /// Return number of elems per bucket.
     /// High performance not required, so directly returns a vector.
@@ -138,6 +127,10 @@ public:
 
     /// Return size / bucket_count.
     float LoadFactor() const;
+
+    std::shared_ptr<DeviceHashmap> GetDeviceHashmap() const {
+        return device_hashmap_;
+    }
 
 protected:
     void AssertKeyDtype(const Dtype& dtype_key,
@@ -149,10 +142,10 @@ protected:
     Dtype GetValueDtype() const { return dtype_value_; }
 
 private:
-    std::shared_ptr<DefaultDeviceHashmap> device_hashmap_;
+    std::shared_ptr<DeviceHashmap> device_hashmap_;
 
-    Dtype dtype_key_ = Dtype::Undefined;
-    Dtype dtype_value_ = Dtype::Undefined;
+    Dtype dtype_key_;
+    Dtype dtype_value_;
 
     SizeVector element_shape_key_;
     SizeVector element_shape_value_;
