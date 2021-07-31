@@ -146,6 +146,10 @@ public:
     /// closing or false to cancel the close.
     void SetOnClose(std::function<bool()> callback);
 
+    /// Set a keyboard callback that will be called on keyboard event not handled by imGUI.
+    /// So this will not destroy imgui-typing functionalities...
+    void SetOnKey(std::function<int(const KeyEvent &)> callback);
+
     /// Shows the dialog. If a dialog is currently being shown it will be
     /// closed.
     void ShowDialog(std::shared_ptr<Dialog> dlg);

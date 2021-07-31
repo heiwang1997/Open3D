@@ -164,6 +164,8 @@ void pybind_o3dvisualizer(py::module& m) {
                  "closed. The callback is given no arguments and should return "
                  "True to continue closing the window or False to cancel the "
                  "close")
+            .def("set_on_key", &O3DVisualizer::SetOnKey,
+                 "Set a key callback. Please see Jiahui's note.")
             // from O3DVisualizer
             .def("add_action", &O3DVisualizer::AddAction,
                  "Adds a button to the custom actions section of the UI "

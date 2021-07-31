@@ -97,6 +97,7 @@ struct Window::Impl {
     std::unordered_map<Menu::ItemId, std::function<void()>> menu_callbacks_;
     std::function<bool(void)> on_tick_event_;
     std::function<bool(void)> on_close_;
+    std::function<int(const KeyEvent &)> on_key_;
     // We need these for mouse moves and wheel events.
     // The only source of ground truth is button events, so the rest of
     // the time we monitor key up/down events.
@@ -574,6 +575,10 @@ void Window::SetOnTickEvent(std::function<bool()> callback) {
 
 void Window::SetOnClose(std::function<bool()> callback) {
     impl_->on_close_ = callback;
+}
+
+void Window::SetOnKey(std::function<int(const KeyEvent &)> callback) {
+    impl_->on_key_ = callback;
 }
 
 void Window::ShowDialog(std::shared_ptr<Dialog> dlg) {
@@ -1136,10 +1141,21 @@ void Window::OnKeyEvent(const KeyEvent& e) {
         io.KeysDown[e.key] = (e.type == KeyEvent::DOWN);
     }
 
-    // If an ImGUI widget is not getting keystrokes, we can send them to
-    // non-ImGUI widgets
-    if (ImGui::GetCurrentContext()->ActiveId == 0 && impl_->focus_widget_) {
-        impl_->focus_widget_->Key(e);
+    // Jiahui: This global window callback is having more previl than individual widgets.
+    bool ignore_widget = false;
+    if (impl_->on_key_) {
+        switch (impl_->on_key_(e)) {
+            case 0: ignore_widget = true;
+            default: break;
+        }
+    }
+
+    if (!ignore_widget) {
+        // If an ImGUI widget is not getting keystrokes, we can send them to
+        // non-ImGUI widgets
+        if (ImGui::GetCurrentContext()->ActiveId == 0 && impl_->focus_widget_) {
+            impl_->focus_widget_->Key(e);
+        }
     }
 
     RestoreDrawContext(old_context);
