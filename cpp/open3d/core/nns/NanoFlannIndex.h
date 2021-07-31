@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // The MIT License (MIT)
 //
-// Copyright (c) 2018 www.open3d.org
+// Copyright (c) 2018-2021 www.open3d.org
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -30,7 +30,8 @@
 
 #include "open3d/core/Tensor.h"
 #include "open3d/core/nns/NNSIndex.h"
-#include "open3d/utility/Console.h"
+#include "open3d/core/nns/NeighborSearchCommon.h"
+#include "open3d/utility/Logging.h"
 
 // Forward declarations.
 namespace nanoflann {
@@ -52,7 +53,7 @@ namespace core {
 namespace nns {
 
 /// Distance metric enum.
-enum Metric { L1, L2, Linf };
+// enum Metric { L1, L2, Linf };
 
 /// Base struct for Index holder
 struct NanoFlannIndexHolderBase {
@@ -60,18 +61,20 @@ struct NanoFlannIndexHolderBase {
 };
 
 /// NanoFlann Index Holder.
-template <int METRIC, class T>
+template <int METRIC, class TReal, class TIndex>
 struct NanoFlannIndexHolder : NanoFlannIndexHolderBase {
     /// This class is the Adaptor for connecting Open3D Tensor and NanoFlann.
     struct DataAdaptor {
-        DataAdaptor(size_t dataset_size, int dimension, const T *const data_ptr)
+        DataAdaptor(size_t dataset_size,
+                    int dimension,
+                    const TReal *const data_ptr)
             : dataset_size_(dataset_size),
               dimension_(dimension),
               data_ptr_(data_ptr) {}
 
         inline size_t kdtree_get_point_count() const { return dataset_size_; }
 
-        inline T kdtree_get_pt(const size_t idx, const size_t dim) const {
+        inline TReal kdtree_get_pt(const size_t idx, const size_t dim) const {
             return data_ptr_[idx * dimension_ + dim];
         }
 
@@ -82,7 +85,7 @@ struct NanoFlannIndexHolder : NanoFlannIndexHolderBase {
 
         size_t dataset_size_ = 0;
         int dimension_ = 0;
-        const T *const data_ptr_;
+        const TReal *const data_ptr_;
     };
 
     /// Adaptor Selector.
@@ -91,12 +94,12 @@ struct NanoFlannIndexHolder : NanoFlannIndexHolderBase {
 
     template <typename fake>
     struct SelectNanoflannAdaptor<L2, fake> {
-        typedef nanoflann::L2_Adaptor<T, DataAdaptor, T> adaptor_t;
+        typedef nanoflann::L2_Adaptor<TReal, DataAdaptor, TReal> adaptor_t;
     };
 
     template <typename fake>
     struct SelectNanoflannAdaptor<L1, fake> {
-        typedef nanoflann::L1_Adaptor<T, DataAdaptor, T> adaptor_t;
+        typedef nanoflann::L1_Adaptor<TReal, DataAdaptor, TReal> adaptor_t;
     };
 
     /// typedef for KDtree.
@@ -104,12 +107,12 @@ struct NanoFlannIndexHolder : NanoFlannIndexHolderBase {
             typename SelectNanoflannAdaptor<METRIC>::adaptor_t,
             DataAdaptor,
             -1,
-            int64_t>
+            TIndex>
             KDTree_t;
 
     NanoFlannIndexHolder(size_t dataset_size,
                          int dimension,
-                         const T *data_ptr) {
+                         const TReal *data_ptr) {
         adaptor_.reset(new DataAdaptor(dataset_size, dimension, data_ptr));
         index_.reset(new KDTree_t(dimension, *adaptor_.get()));
         index_->buildIndex();
@@ -129,7 +132,7 @@ public:
 
     /// \brief Parameterized Constructor.
     ///
-    /// \param tensor Provides a set of data points as Tensor for KDTree
+    /// \param dataset_points Provides a set of data points as Tensor for KDTree
     /// construction.
     NanoFlannIndex(const Tensor &dataset_points);
     ~NanoFlannIndex();
@@ -144,22 +147,61 @@ public:
                 "NanoFlannIndex::SetTensorData with radius not implemented.");
     }
 
+    /// Perform K nearest neighbor search.
+    ///
+    /// \param query_points Query points. Must be 2D, with shape {n, d}, same
+    /// dtype with dataset_points.
+    /// \param knn Number of nearest neighbor to search.
+    /// \return Pair of Tensors: (indices, distances):
+    /// - indices: Tensor of shape {n, knn}, with dtype Int64.
+    /// - distainces: Tensor of shape {n, knn}, same dtype with dataset_points.
     std::pair<Tensor, Tensor> SearchKnn(const Tensor &query_points,
                                         int knn) const override;
 
+    /// Perform radius search with multiple radii.
+    ///
+    /// \param query_points Query points. Must be 2D, with shape {n, d}, same
+    /// dtype with dataset_points.
+    /// \param radii list of radius. Must be 1D, with shape {n, }.
+    /// \return Tuple of Tensors: (indices, distances, counts):
+    /// - indicecs: Tensor of shape {total_num_neighbors,}, dtype Int64.
+    /// - distances: Tensor of shape {total_num_neighbors,}, same dtype with
+    /// dataset_points.
+    /// - counts: Tensor of shape {n,}, dtype Int64.
     std::tuple<Tensor, Tensor, Tensor> SearchRadius(
             const Tensor &query_points,
             const Tensor &radii,
             bool sort = true) const override;
 
+    /// Perform radius search.
+    ///
+    /// \param query_points Query points. Must be 2D, with shape {n, d}, same
+    /// dtype with dataset_points.
+    /// \param radius Radius.
+    /// \return Tuple of Tensors, (indices, distances, counts):
+    /// - indicecs: Tensor of shape {total_num_neighbors,}, dtype Int64.
+    /// - distances: Tensor of shape {total_num_neighbors,}, same dtype with
+    /// dataset_points.
+    /// - counts: Tensor of shape {n}, dtype Int64.
     std::tuple<Tensor, Tensor, Tensor> SearchRadius(
             const Tensor &query_points,
             double radius,
             bool sort = true) const override;
 
-    std::pair<Tensor, Tensor> SearchHybrid(const Tensor &query_points,
-                                           double radius,
-                                           int max_knn) const override;
+    /// Perform hybrid search.
+    ///
+    /// \param query_points Query points. Must be 2D, with shape {n, d}.
+    /// \param radius Radius.
+    /// \param max_knn Maximum number of
+    /// neighbor to search per query point.
+    /// \return Tuple of Tensors, (indices, distances, counts):
+    /// - indices: Tensor of shape {n, knn}, with dtype Int64.
+    /// - distances: Tensor of shape {n, knn}, with dtype Float32.
+    /// - counts: Counts of neighbour for each query points. [Tensor
+    /// of shape {n}, with dtype Int64].
+    std::tuple<Tensor, Tensor, Tensor> SearchHybrid(const Tensor &query_points,
+                                                    double radius,
+                                                    int max_knn) const override;
 
 protected:
     // Tensor dataset_points_;

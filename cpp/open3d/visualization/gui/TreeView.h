@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // The MIT License (MIT)
 //
-// Copyright (c) 2020 www.open3d.org
+// Copyright (c) 2018-2021 www.open3d.org
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -54,9 +54,9 @@ public:
     std::shared_ptr<Checkbox> GetCheckbox();
     std::shared_ptr<Label> GetLabel();
 
-    Size CalcPreferredSize(const Theme& theme,
+    Size CalcPreferredSize(const LayoutContext& context,
                            const Constraints& constraints) const override;
-    void Layout(const Theme& theme) override;
+    void Layout(const LayoutContext& context) override;
 
 private:
     struct Impl;
@@ -76,9 +76,9 @@ public:
     std::shared_ptr<Label> GetLabel();
     std::shared_ptr<ColorEdit> GetColorEdit();
 
-    Size CalcPreferredSize(const Theme& theme,
+    Size CalcPreferredSize(const LayoutContext& context,
                            const Constraints& constraints) const override;
-    void Layout(const Theme& theme) override;
+    void Layout(const LayoutContext& context) override;
 
 private:
     struct Impl;
@@ -96,9 +96,9 @@ public:
     std::shared_ptr<NumberEdit> GetNumberEdit();
     std::shared_ptr<ColorEdit> GetColorEdit();
 
-    Size CalcPreferredSize(const Theme& theme,
+    Size CalcPreferredSize(const LayoutContext& context,
                            const Constraints& constraints) const override;
-    void Layout(const Theme& theme) override;
+    void Layout(const LayoutContext& context) override;
 
 private:
     struct Impl;
@@ -140,10 +140,11 @@ public:
     /// Selects the indicated item of the list. Does not call onValueChanged.
     void SetSelectedItemId(ItemId item_id);
 
-    Size CalcPreferredSize(const Theme& theme,
+    Size CalcPreferredSize(const LayoutContext& context,
                            const Constraints& constraints) const override;
+    Size CalcMinimumSize(const LayoutContext& context) const override;
 
-    void Layout(const Theme& theme) override;
+    void Layout(const LayoutContext& context) override;
 
     DrawResult Draw(const DrawContext& context) override;
 

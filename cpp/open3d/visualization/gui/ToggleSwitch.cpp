@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // The MIT License (MIT)
 //
-// Copyright (c) 2021 www.open3d.org
+// Copyright (c) 2018-2021 www.open3d.org
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -38,16 +38,20 @@ namespace gui {
 namespace {
 float CalcSwitchWidth(float height) { return height * 1.55f; }
 
+static int g_next_toggle_id = 1;
 }  // namespace
 
 struct ToggleSwitch::Impl {
     std::string name_;
+    std::string id_;
     bool is_on_ = false;
     std::function<void(bool)> on_clicked_;
 };
 
 ToggleSwitch::ToggleSwitch(const char* name) : impl_(new ToggleSwitch::Impl()) {
     impl_->name_ = name;
+    impl_->id_ =
+            impl_->name_ + "##toggle_" + std::to_string(g_next_toggle_id++);
 }
 
 ToggleSwitch::~ToggleSwitch() {}
@@ -60,13 +64,13 @@ void ToggleSwitch::SetOnClicked(std::function<void(bool)> on_clicked) {
     impl_->on_clicked_ = on_clicked;
 }
 
-Size ToggleSwitch::CalcPreferredSize(const Theme& theme,
+Size ToggleSwitch::CalcPreferredSize(const LayoutContext& context,
                                      const Constraints& constraints) const {
     auto em = ImGui::GetTextLineHeight();
     auto padding = ImGui::GetStyle().FramePadding;
-    auto text_size = ImGui::GetFont()->CalcTextSizeA(float(theme.font_size),
-                                                     constraints.width, 10000,
-                                                     impl_->name_.c_str());
+    auto text_size = ImGui::GetFont()->CalcTextSizeA(
+            float(context.theme.font_size), constraints.width, 10000,
+            impl_->name_.c_str());
     int height = int(std::ceil(em + 2.0f * padding.y));
     auto switch_width = CalcSwitchWidth(height);
     return Size(int(switch_width + std::ceil(text_size.x + 2.0f * padding.x)),
@@ -76,7 +80,8 @@ Size ToggleSwitch::CalcPreferredSize(const Theme& theme,
 Widget::DrawResult ToggleSwitch::Draw(const DrawContext& context) {
     auto& theme = context.theme;
     auto& frame = GetFrame();
-    ImGui::SetCursorScreenPos(ImVec2(float(frame.x), float(frame.y)));
+    ImGui::SetCursorScreenPos(
+            ImVec2(float(frame.x), float(frame.y) - ImGui::GetScrollY()));
     auto result = Widget::DrawResult::NONE;
 
     DrawImGuiPushEnabledState();
@@ -91,6 +96,7 @@ Widget::DrawResult ToggleSwitch::Draw(const DrawContext& context) {
     float radius = height * 0.50f;
 
     ImGui::InvisibleButton(impl_->name_.c_str(), ImVec2(width, height));
+    DrawImGuiTooltip();  // button is separate obj, so needs its own call
     ImU32 track_color;
     ImU32 thumb_color = colorToImguiRGBA(theme.toggle_thumb_color);
     if (impl_->is_on_) {
@@ -134,6 +140,7 @@ Widget::DrawResult ToggleSwitch::Draw(const DrawContext& context) {
     ImGui::TextUnformatted(impl_->name_.c_str());
     ImGui::PopItemWidth();
     DrawImGuiPopEnabledState();
+    DrawImGuiTooltip();
 
     return result;
 }

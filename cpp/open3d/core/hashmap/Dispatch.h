@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // The MIT License (MIT)
 //
-// Copyright (c) 2018 www.open3d.org
+// Copyright (c) 2018-2021 www.open3d.org
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -27,12 +27,12 @@
 #pragma once
 
 #include "open3d/core/Dtype.h"
-#include "open3d/utility/Console.h"
+#include "open3d/utility/Logging.h"
 
 // TODO: dispatch more combinations.
 #define DISPATCH_DTYPE_AND_DIM_TO_TEMPLATE(DTYPE, DIM, ...)                  \
     [&] {                                                                    \
-        if (DTYPE == open3d::core::Dtype::Int32) {                           \
+        if (DTYPE == open3d::core::Int32) {                                  \
             if (DIM == 1) {                                                  \
                 using key_t = Block<int, 1>;                                 \
                 using hash_t = BlockHash<int, 1>;                            \
@@ -46,7 +46,7 @@
                 using hash_t = BlockHash<int, 3>;                            \
                 return __VA_ARGS__();                                        \
             }                                                                \
-        } else if (DTYPE == open3d::core::Dtype::Int64) {                    \
+        } else if (DTYPE == open3d::core::Int64) {                           \
             if (DIM == 1) {                                                  \
                 using key_t = Block<int64_t, 1>;                             \
                 using hash_t = BlockHash<int64_t, 1>;                        \
@@ -71,7 +71,29 @@ namespace core {
 template <typename T, size_t N>
 class Block {
 public:
-    bool OPEN3D_HOST_DEVICE operator==(const Block<T, N>& other) const {
+    Block() = default;
+
+    OPEN3D_HOST_DEVICE Block(const Block<T, N>& other) {
+#if defined(__CUDA_ARCH__)
+#pragma unroll
+#endif
+        for (size_t i = 0; i < N; ++i) {
+            data_[i] = other.data_[i];
+        }
+    }
+
+    OPEN3D_HOST_DEVICE Block<T, N>& operator=(const Block<T, N>& other) {
+#if defined(__CUDA_ARCH__)
+#pragma unroll
+#endif
+        for (size_t i = 0; i < N; ++i) {
+            data_[i] = other.data_[i];
+        }
+
+        return *this;
+    }
+
+    OPEN3D_HOST_DEVICE bool operator==(const Block<T, N>& other) const {
         bool is_eq = true;
 #if defined(__CUDA_ARCH__)
 #pragma unroll
@@ -82,17 +104,8 @@ public:
         return is_eq;
     }
 
-    void OPEN3D_HOST_DEVICE operator=(const Block<T, N>& other) {
-#if defined(__CUDA_ARCH__)
-#pragma unroll
-#endif
-        for (size_t i = 0; i < N; ++i) {
-            data_[i] = other.data_[i];
-        }
-    }
-
-    const T& OPEN3D_HOST_DEVICE operator()(size_t i) const { return data_[i]; }
-    T& OPEN3D_HOST_DEVICE operator()(size_t i) { return data_[i]; }
+    OPEN3D_HOST_DEVICE T Get(size_t i) const { return data_[i]; }
+    OPEN3D_HOST_DEVICE void Set(size_t i, const T& value) { data_[i] = value; }
 
 private:
     T data_[N];
@@ -101,13 +114,13 @@ private:
 template <typename T, size_t N>
 struct BlockHash {
 public:
-    uint64_t OPEN3D_HOST_DEVICE operator()(const Block<T, N>& key) const {
+    OPEN3D_HOST_DEVICE uint64_t operator()(const Block<T, N>& key) const {
         uint64_t hash = UINT64_C(14695981039346656037);
 #if defined(__CUDA_ARCH__)
 #pragma unroll
 #endif
         for (size_t i = 0; i < N; ++i) {
-            hash ^= static_cast<uint64_t>(key(i));
+            hash ^= static_cast<uint64_t>(key.Get(i));
             hash *= UINT64_C(1099511628211);
         }
         return hash;

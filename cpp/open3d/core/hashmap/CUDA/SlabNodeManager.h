@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // The MIT License (MIT)
 //
-// Copyright (c) 2018 www.open3d.org
+// Copyright (c) 2018-2021 www.open3d.org
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -42,7 +42,6 @@
 
 #include <thrust/device_vector.h>
 
-#include <cassert>
 #include <memory>
 #include <random>
 
@@ -247,7 +246,12 @@ public:
         impl_.super_blocks_ = static_cast<uint32_t*>(MemoryManager::Malloc(
                 kUIntsPerSuperBlock * kSuperBlocks * sizeof(uint32_t),
                 device_));
+        Reset();
+    }
 
+    ~SlabNodeManager() { MemoryManager::Free(impl_.super_blocks_, device_); }
+
+    void Reset() {
         OPEN3D_CUDA_CHECK(cudaMemset(
                 impl_.super_blocks_, 0xFF,
                 kUIntsPerSuperBlock * kSuperBlocks * sizeof(uint32_t)));
@@ -258,9 +262,9 @@ public:
                     impl_.super_blocks_ + i * kUIntsPerSuperBlock, 0x00,
                     kBlocksPerSuperBlock * kSlabsPerBlock * sizeof(uint32_t)));
         }
+        cuda::Synchronize();
+        OPEN3D_CUDA_CHECK(cudaGetLastError());
     }
-
-    ~SlabNodeManager() { MemoryManager::Free(impl_.super_blocks_, device_); }
 
     std::vector<int> CountSlabsPerSuperblock() {
         const uint32_t num_super_blocks = kSuperBlocks;
@@ -273,16 +277,17 @@ public:
         int num_mem_units = kBlocksPerSuperBlock * 32;
         int num_cuda_blocks =
                 (num_mem_units + kThreadsPerBlock - 1) / kThreadsPerBlock;
-        CountSlabsPerSuperblockKernel<<<num_cuda_blocks, kThreadsPerBlock>>>(
+        CountSlabsPerSuperblockKernel<<<num_cuda_blocks, kThreadsPerBlock, 0,
+                                        core::cuda::GetStream()>>>(
                 impl_, thrust::raw_pointer_cast(slabs_per_superblock.data()));
-        OPEN3D_CUDA_CHECK(cudaDeviceSynchronize());
+        cuda::Synchronize();
         OPEN3D_CUDA_CHECK(cudaGetLastError());
 
         std::vector<int> result(num_super_blocks);
         thrust::copy(slabs_per_superblock.begin(), slabs_per_superblock.end(),
                      result.begin());
 
-        return std::move(result);
+        return result;
     }
 
 public:

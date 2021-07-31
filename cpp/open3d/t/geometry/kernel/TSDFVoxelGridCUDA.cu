@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // The MIT License (MIT)
 //
-// Copyright (c) 2018 www.open3d.org
+// Copyright (c) 2018-2021 www.open3d.org
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -27,18 +27,18 @@
 #include "open3d/core/Dispatch.h"
 #include "open3d/core/Dtype.h"
 #include "open3d/core/MemoryManager.h"
+#include "open3d/core/ParallelFor.h"
 #include "open3d/core/SizeVector.h"
 #include "open3d/core/Tensor.h"
 #include "open3d/core/hashmap/CUDA/StdGPUHashmap.h"
 #include "open3d/core/hashmap/DeviceHashmap.h"
 #include "open3d/core/hashmap/Dispatch.h"
 #include "open3d/core/hashmap/Hashmap.h"
-#include "open3d/core/kernel/CUDALauncher.cuh"
 #include "open3d/t/geometry/kernel/GeometryIndexer.h"
 #include "open3d/t/geometry/kernel/GeometryMacros.h"
 #include "open3d/t/geometry/kernel/TSDFVoxelGrid.h"
 #include "open3d/t/geometry/kernel/TSDFVoxelGridImpl.h"
-#include "open3d/utility/Console.h"
+#include "open3d/utility/Logging.h"
 
 namespace open3d {
 namespace t {
@@ -47,7 +47,7 @@ namespace kernel {
 namespace tsdf {
 struct Coord3i {
     OPEN3D_HOST_DEVICE Coord3i(int x, int y, int z) : x_(x), y_(y), z_(z) {}
-    bool OPEN3D_HOST_DEVICE operator==(const Coord3i& other) const {
+    OPEN3D_HOST_DEVICE bool operator==(const Coord3i& other) const {
         return x_ == other.x_ && y_ == other.y_ && z_ == other.z_;
     }
 
@@ -56,7 +56,8 @@ struct Coord3i {
     int64_t z_;
 };
 
-void TouchCUDA(const core::Tensor& points,
+void TouchCUDA(std::shared_ptr<core::Hashmap>& hashmap,
+               const core::Tensor& points,
                core::Tensor& voxel_block_coords,
                int64_t voxel_grid_resolution,
                float voxel_size,
@@ -68,13 +69,13 @@ void TouchCUDA(const core::Tensor& points,
     const float* pcd_ptr = static_cast<const float*>(points.GetDataPtr());
 
     core::Device device = points.GetDevice();
-    core::Tensor block_coordi({8 * n, 3}, core::Dtype::Int32, device);
+    core::Tensor block_coordi({8 * n, 3}, core::Int32, device);
     int* block_coordi_ptr = static_cast<int*>(block_coordi.GetDataPtr());
-    core::Tensor count(std::vector<int>{0}, {}, core::Dtype::Int32, device);
+    core::Tensor count(std::vector<int>{0}, {}, core::Int32, device);
     int* count_ptr = static_cast<int*>(count.GetDataPtr());
 
-    core::kernel::CUDALauncher::LaunchGeneralKernel(
-            n, [=] OPEN3D_DEVICE(int64_t workload_idx) {
+    core::ParallelFor(
+            hashmap->GetDevice(), n, [=] OPEN3D_DEVICE(int64_t workload_idx) {
                 float x = pcd_ptr[3 * workload_idx + 0];
                 float y = pcd_ptr[3 * workload_idx + 1];
                 float z = pcd_ptr[3 * workload_idx + 2];
@@ -112,11 +113,9 @@ void TouchCUDA(const core::Tensor& points,
                 "especially depth_scale and voxel_size");
     }
     block_coordi = block_coordi.Slice(0, 0, total_block_count);
-    core::Hashmap pcd_block_hashmap(total_block_count, core::Dtype::Int32,
-                                    core::Dtype::Int32, {3}, {1}, device);
     core::Tensor block_addrs, block_masks;
-    pcd_block_hashmap.Activate(block_coordi.Slice(0, 0, count.Item<int>()),
-                               block_addrs, block_masks);
+    hashmap->Activate(block_coordi.Slice(0, 0, count.Item<int>()), block_addrs,
+                      block_masks);
     voxel_block_coords = block_coordi.IndexGet({block_masks});
 }
 

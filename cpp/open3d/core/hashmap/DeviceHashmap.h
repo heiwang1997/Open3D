@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // The MIT License (MIT)
 //
-// Copyright (c) 2018 www.open3d.org
+// Copyright (c) 2018-2021 www.open3d.org
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -85,6 +85,9 @@ public:
 
     /// Parallel collect all iterators in the hash table
     virtual int64_t GetActiveIndices(addr_t* output_indices) = 0;
+
+    /// Clear stored map without reallocating memory.
+    virtual void Clear() = 0;
 
     virtual int64_t Size() const = 0;
     virtual int64_t GetBucketCount() const = 0;

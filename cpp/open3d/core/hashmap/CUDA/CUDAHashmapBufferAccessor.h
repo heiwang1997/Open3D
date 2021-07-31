@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // The MIT License (MIT)
 //
-// Copyright (c) 2018 www.open3d.org
+// Copyright (c) 2018-2021 www.open3d.org
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -60,6 +60,8 @@ public:
         values_ = values.GetDataPtr<uint8_t>();
         heap_ = static_cast<addr_t *>(heap.GetDataPtr());
         OPEN3D_CUDA_CHECK(cudaMemset(values_, 0, capacity_ * dsize_value_));
+        cuda::Synchronize();
+        OPEN3D_CUDA_CHECK(cudaGetLastError());
     }
 
     __host__ void Reset(const Device &device) {
@@ -69,9 +71,9 @@ public:
 
         const int blocks =
                 (capacity_ + kThreadsPerBlock - 1) / kThreadsPerBlock;
-        ResetHashmapBufferKernel<<<blocks, kThreadsPerBlock>>>(heap_,
-                                                               capacity_);
-        OPEN3D_CUDA_CHECK(cudaDeviceSynchronize());
+        ResetHashmapBufferKernel<<<blocks, kThreadsPerBlock, 0,
+                                   core::cuda::GetStream()>>>(heap_, capacity_);
+        cuda::Synchronize();
         OPEN3D_CUDA_CHECK(cudaGetLastError());
     }
 

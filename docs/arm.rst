@@ -63,7 +63,7 @@ Build
     source ${HOME}/venv/bin/activate
 
     # Clone
-    git clone --recursive https://github.com/intel-isl/Open3D
+    git clone --recursive https://github.com/isl-org/Open3D
     cd Open3D
     git submodule update --init --recursive
     mkdir build
@@ -82,7 +82,6 @@ Build
         -DBUILD_PYTORCH_OPS=OFF \
         -DBUILD_UNIT_TESTS=ON \
         -DCMAKE_INSTALL_PREFIX=~/open3d_install \
-        -DPYTHON_EXECUTABLE=$(which python) \
         ..
 
     # Build C++ library

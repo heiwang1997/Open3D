@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // The MIT License (MIT)
 //
-// Copyright (c) 2018 www.open3d.org
+// Copyright (c) 2018-2021 www.open3d.org
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -25,8 +25,8 @@
 // ----------------------------------------------------------------------------
 
 #include "open3d/core/Dispatch.h"
+#include "open3d/core/ParallelFor.h"
 #include "open3d/core/Tensor.h"
-#include "open3d/core/kernel/CUDALauncher.cuh"
 #include "open3d/core/linalg/TriImpl.h"
 
 namespace open3d {
@@ -41,8 +41,8 @@ void TriuCUDA(const Tensor &A, Tensor &output, const int diagonal) {
         int cols = A.GetShape()[1];
         int n = A.GetShape()[0] * cols;
 
-        core::kernel::CUDALauncher::LaunchGeneralKernel(
-                n, [=] OPEN3D_DEVICE(int64_t workload_idx) {
+        core::ParallelFor(
+                A.GetDevice(), n, [=] OPEN3D_DEVICE(int64_t workload_idx) {
                     const int64_t idx = workload_idx / cols;
                     const int64_t idy = workload_idx % cols;
                     if (idy - idx >= diagonal) {
@@ -61,8 +61,8 @@ void TrilCUDA(const Tensor &A, Tensor &output, const int diagonal) {
         int cols = A.GetShape()[1];
         int n = A.GetShape()[0] * cols;
 
-        core::kernel::CUDALauncher::LaunchGeneralKernel(
-                n, [=] OPEN3D_DEVICE(int64_t workload_idx) {
+        core::ParallelFor(
+                A.GetDevice(), n, [=] OPEN3D_DEVICE(int64_t workload_idx) {
                     const int64_t idx = workload_idx / cols;
                     const int64_t idy = workload_idx % cols;
                     if (idy - idx <= diagonal) {
@@ -85,8 +85,8 @@ void TriulCUDA(const Tensor &A,
         int cols = A.GetShape()[1];
         int n = A.GetShape()[0] * cols;
 
-        core::kernel::CUDALauncher::LaunchGeneralKernel(
-                n, [=] OPEN3D_DEVICE(int64_t workload_idx) {
+        core::ParallelFor(
+                A.GetDevice(), n, [=] OPEN3D_DEVICE(int64_t workload_idx) {
                     const int64_t idx = workload_idx / cols;
                     const int64_t idy = workload_idx % cols;
                     if (idy - idx < diagonal) {

@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // The MIT License (MIT)
 //
-// Copyright (c) 2018 www.open3d.org
+// Copyright (c) 2018-2021 www.open3d.org
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -26,7 +26,6 @@
 
 #pragma once
 
-#include <cassert>
 #include <memory>
 
 #include "open3d/core/CUDAUtils.h"
@@ -68,6 +67,7 @@ public:
                int64_t count) override;
 
     int64_t GetActiveIndices(addr_t* output_indices) override;
+    void Clear() override;
 
     int64_t Size() const override;
     int64_t GetBucketCount() const override;
@@ -122,10 +122,10 @@ void SlabHashmap<Key, Hash>::Rehash(int64_t buckets) {
 
     if (iterator_count > 0) {
         Tensor active_addrs =
-                Tensor({iterator_count}, Dtype::Int32, this->device_);
+                Tensor({iterator_count}, core::Int32, this->device_);
         GetActiveIndices(static_cast<addr_t*>(active_addrs.GetDataPtr()));
 
-        Tensor active_indices = active_addrs.To(Dtype::Int64);
+        Tensor active_indices = active_addrs.To(core::Int64);
         active_keys = this->buffer_->GetKeyBuffer().IndexGet({active_indices});
         active_values =
                 this->buffer_->GetValueBuffer().IndexGet({active_indices});
@@ -135,19 +135,19 @@ void SlabHashmap<Key, Hash>::Rehash(int64_t buckets) {
             float(this->capacity_) / float(this->bucket_count_);
 
     Free();
-    CUDACachedMemoryManager::ReleaseCache();
 
-    Allocate(buckets, int64_t(std::ceil(buckets * avg_capacity_per_bucket)));
+    Allocate(buckets,
+             std::max(int64_t(std::ceil(buckets * avg_capacity_per_bucket)),
+                      active_keys.GetLength()));
 
     if (iterator_count > 0) {
-        Tensor output_addrs({iterator_count}, Dtype::Int32, this->device_);
-        Tensor output_masks({iterator_count}, Dtype::Bool, this->device_);
+        Tensor output_addrs({iterator_count}, core::Int32, this->device_);
+        Tensor output_masks({iterator_count}, core::Bool, this->device_);
 
         InsertImpl(active_keys.GetDataPtr(), active_values.GetDataPtr(),
                    static_cast<addr_t*>(output_addrs.GetDataPtr()),
                    output_masks.GetDataPtr<bool>(), iterator_count);
     }
-    CUDACachedMemoryManager::ReleaseCache();
 }
 
 template <typename Key, typename Hash>
@@ -185,12 +185,14 @@ void SlabHashmap<Key, Hash>::Find(const void* input_keys,
     if (count == 0) return;
 
     OPEN3D_CUDA_CHECK(cudaMemset(output_masks, 0, sizeof(bool) * count));
+    cuda::Synchronize();
+    OPEN3D_CUDA_CHECK(cudaGetLastError());
 
     const int64_t num_blocks =
             (count + kThreadsPerBlock - 1) / kThreadsPerBlock;
-    FindKernel<<<num_blocks, kThreadsPerBlock>>>(
+    FindKernel<<<num_blocks, kThreadsPerBlock, 0, core::cuda::GetStream()>>>(
             impl_, input_keys, output_addrs, output_masks, count);
-    OPEN3D_CUDA_CHECK(cudaDeviceSynchronize());
+    cuda::Synchronize();
     OPEN3D_CUDA_CHECK(cudaGetLastError());
 }
 
@@ -201,16 +203,20 @@ void SlabHashmap<Key, Hash>::Erase(const void* input_keys,
     if (count == 0) return;
 
     OPEN3D_CUDA_CHECK(cudaMemset(output_masks, 0, sizeof(bool) * count));
+    cuda::Synchronize();
+    OPEN3D_CUDA_CHECK(cudaGetLastError());
     auto iterator_addrs = static_cast<addr_t*>(
             MemoryManager::Malloc(sizeof(addr_t) * count, this->device_));
 
     const int64_t num_blocks =
             (count + kThreadsPerBlock - 1) / kThreadsPerBlock;
-    EraseKernelPass0<<<num_blocks, kThreadsPerBlock>>>(
+    EraseKernelPass0<<<num_blocks, kThreadsPerBlock, 0,
+                       core::cuda::GetStream()>>>(
             impl_, input_keys, iterator_addrs, output_masks, count);
-    EraseKernelPass1<<<num_blocks, kThreadsPerBlock>>>(impl_, iterator_addrs,
-                                                       output_masks, count);
-    OPEN3D_CUDA_CHECK(cudaDeviceSynchronize());
+    EraseKernelPass1<<<num_blocks, kThreadsPerBlock, 0,
+                       core::cuda::GetStream()>>>(impl_, iterator_addrs,
+                                                  output_masks, count);
+    cuda::Synchronize();
     OPEN3D_CUDA_CHECK(cudaGetLastError());
 
     MemoryManager::Free(iterator_addrs, this->device_);
@@ -220,14 +226,17 @@ template <typename Key, typename Hash>
 int64_t SlabHashmap<Key, Hash>::GetActiveIndices(addr_t* output_addrs) {
     uint32_t* iterator_count = static_cast<uint32_t*>(
             MemoryManager::Malloc(sizeof(uint32_t), this->device_));
-    cudaMemset(iterator_count, 0, sizeof(uint32_t));
+    OPEN3D_CUDA_CHECK(cudaMemset(iterator_count, 0, sizeof(uint32_t)));
+    cuda::Synchronize();
+    OPEN3D_CUDA_CHECK(cudaGetLastError());
 
     const int64_t num_blocks =
             (impl_.bucket_count_ * kWarpSize + kThreadsPerBlock - 1) /
             kThreadsPerBlock;
-    GetActiveIndicesKernel<<<num_blocks, kThreadsPerBlock>>>(
-            impl_, output_addrs, iterator_count);
-    OPEN3D_CUDA_CHECK(cudaDeviceSynchronize());
+    GetActiveIndicesKernel<<<num_blocks, kThreadsPerBlock, 0,
+                             core::cuda::GetStream()>>>(impl_, output_addrs,
+                                                        iterator_count);
+    cuda::Synchronize();
     OPEN3D_CUDA_CHECK(cudaGetLastError());
 
     uint32_t ret;
@@ -236,6 +245,21 @@ int64_t SlabHashmap<Key, Hash>::GetActiveIndices(addr_t* output_addrs) {
     MemoryManager::Free(iterator_count, this->device_);
 
     return static_cast<int64_t>(ret);
+}
+
+template <typename Key, typename Hash>
+void SlabHashmap<Key, Hash>::Clear() {
+    // Clear the heap
+    buffer_accessor_.Reset(this->device_);
+
+    // Clear the linked list heads
+    OPEN3D_CUDA_CHECK(cudaMemset(impl_.bucket_list_head_, 0xFF,
+                                 sizeof(Slab) * this->bucket_count_));
+    cuda::Synchronize();
+    OPEN3D_CUDA_CHECK(cudaGetLastError());
+
+    // Clear the linked list nodes
+    node_mgr_->Reset();
 }
 
 template <typename Key, typename Hash>
@@ -255,15 +279,16 @@ std::vector<int64_t> SlabHashmap<Key, Hash>::BucketSizes() const {
 
     const int64_t num_blocks =
             (impl_.capacity_ + kThreadsPerBlock - 1) / kThreadsPerBlock;
-    CountElemsPerBucketKernel<<<num_blocks, kThreadsPerBlock>>>(
+    CountElemsPerBucketKernel<<<num_blocks, kThreadsPerBlock, 0,
+                                core::cuda::GetStream()>>>(
             impl_, thrust::raw_pointer_cast(elems_per_bucket.data()));
-    OPEN3D_CUDA_CHECK(cudaDeviceSynchronize());
+    cuda::Synchronize();
     OPEN3D_CUDA_CHECK(cudaGetLastError());
 
     std::vector<int64_t> result(impl_.bucket_count_);
     thrust::copy(elems_per_bucket.begin(), elems_per_bucket.end(),
                  result.begin());
-    return std::move(result);
+    return result;
 }
 
 template <typename Key, typename Hash>
@@ -287,13 +312,16 @@ void SlabHashmap<Key, Hash>::InsertImpl(const void* input_keys,
 
     const int64_t num_blocks =
             (count + kThreadsPerBlock - 1) / kThreadsPerBlock;
-    InsertKernelPass0<<<num_blocks, kThreadsPerBlock>>>(
+    InsertKernelPass0<<<num_blocks, kThreadsPerBlock, 0,
+                        core::cuda::GetStream()>>>(
             impl_, input_keys, output_addrs, prev_heap_counter, count);
-    InsertKernelPass1<<<num_blocks, kThreadsPerBlock>>>(
+    InsertKernelPass1<<<num_blocks, kThreadsPerBlock, 0,
+                        core::cuda::GetStream()>>>(
             impl_, input_keys, output_addrs, output_masks, count);
-    InsertKernelPass2<<<num_blocks, kThreadsPerBlock>>>(
+    InsertKernelPass2<<<num_blocks, kThreadsPerBlock, 0,
+                        core::cuda::GetStream()>>>(
             impl_, input_values, output_addrs, output_masks, count);
-    OPEN3D_CUDA_CHECK(cudaDeviceSynchronize());
+    cuda::Synchronize();
     OPEN3D_CUDA_CHECK(cudaGetLastError());
 }
 
@@ -321,6 +349,8 @@ void SlabHashmap<Key, Hash>::Allocate(int64_t bucket_count, int64_t capacity) {
             sizeof(Slab) * this->bucket_count_, this->device_));
     OPEN3D_CUDA_CHECK(cudaMemset(impl_.bucket_list_head_, 0xFF,
                                  sizeof(Slab) * this->bucket_count_));
+    cuda::Synchronize();
+    OPEN3D_CUDA_CHECK(cudaGetLastError());
 
     impl_.Setup(this->bucket_count_, this->capacity_, this->dsize_key_,
                 this->dsize_value_, node_mgr_->impl_, buffer_accessor_);

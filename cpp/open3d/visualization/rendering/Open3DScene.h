@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // The MIT License (MIT)
 //
-// Copyright (c) 2018 www.open3d.org
+// Copyright (c) 2018-2021 www.open3d.org
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -148,9 +148,7 @@ private:
 private:
     Renderer& renderer_;
     SceneHandle scene_;
-    SceneHandle window_scene_;
     ViewHandle view_;
-    ViewHandle window_view_;
 
     Eigen::Vector4f background_color;
     LOD lod_ = LOD::HIGH_DETAIL;

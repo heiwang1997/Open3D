@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 import numpy as np
 import open3d as o3d
 import open3d.visualization.gui as gui
@@ -48,10 +47,11 @@ class ExampleApp:
 
         self.widget3d.set_on_mouse(self._on_mouse_widget3d)
 
-    def _on_layout(self, theme):
+    def _on_layout(self, layout_context):
         r = self.window.content_rect
         self.widget3d.frame = r
-        pref = self.info.calc_preferred_size(theme, gui.Widget.Constraints())
+        pref = self.info.calc_preferred_size(layout_context,
+                                             gui.Widget.Constraints())
         self.info.frame = gui.Rect(r.x,
                                    r.get_bottom() - pref.height, pref.width,
                                    pref.height)

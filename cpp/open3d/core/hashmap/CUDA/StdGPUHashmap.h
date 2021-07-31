@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // The MIT License (MIT)
 //
-// Copyright (c) 2018 www.open3d.org
+// Copyright (c) 2018-2021 www.open3d.org
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -26,22 +26,108 @@
 
 #pragma once
 
-#include <stdgpu/iterator.h>  // device_begin, device_end
-#include <stdgpu/memory.h>    // createDeviceArray, destroyDeviceArray
-#include <stdgpu/platform.h>  // STDGPU_HOST_DEVICE
-#include <thrust/for_each.h>
+#include <stdgpu/memory.h>
 #include <thrust/transform.h>
 
-#include <limits>
-#include <stdgpu/unordered_map.cuh>  // stdgpu::unordered_map
-#include <unordered_map>
+#include <stdgpu/unordered_map.cuh>
+#include <type_traits>
 
+#include "open3d/core/CUDAUtils.h"
+#include "open3d/core/StdAllocator.h"
 #include "open3d/core/hashmap/CUDA/CUDAHashmapBufferAccessor.h"
 #include "open3d/core/hashmap/DeviceHashmap.h"
-#include "open3d/core/kernel/CUDALauncher.cuh"
 
 namespace open3d {
 namespace core {
+
+/// Class satisfying the Allocator requirements defined by the C++ standard.
+/// This bridge makes the MemoryManager interface accessible to all classes
+/// and containers in stdgpu that use the standard Allocator interface.
+///
+/// This allows to allocate (potentially cached) GPU memory in stdgpu.
+template <typename T>
+class StdGPUAllocator {
+public:
+    /// T.
+    using value_type = T;
+
+    /// Default constructor.
+    StdGPUAllocator() = default;
+
+    /// Constructor from device.
+    explicit StdGPUAllocator(const Device& device) : std_allocator_(device) {}
+
+    /// Default copy constructor.
+    StdGPUAllocator(const StdGPUAllocator&) = default;
+
+    /// Default copy assignment operator.
+    StdGPUAllocator& operator=(const StdGPUAllocator&) = default;
+
+    /// Default move constructor.
+    StdGPUAllocator(StdGPUAllocator&&) = default;
+
+    /// Default move assignment operator.
+    StdGPUAllocator& operator=(StdGPUAllocator&&) = default;
+
+    /// Rebind copy constructor.
+    template <typename U>
+    StdGPUAllocator(const StdGPUAllocator<U>& other)
+        : std_allocator_(other.std_allocator_) {}
+
+    /// Allocates memory of size \p n.
+    T* allocate(std::size_t n) {
+        if (GetDevice().GetType() != Device::DeviceType::CUDA) {
+            utility::LogError("Unsupported device.");
+        }
+
+        T* p = std_allocator_.allocate(n);
+        stdgpu::register_memory(p, n, stdgpu::dynamic_memory_type::device);
+        return p;
+    }
+
+    /// Deallocates memory from pointer \p p of size \p n .
+    void deallocate(T* p, std::size_t n) {
+        if (GetDevice().GetType() != Device::DeviceType::CUDA) {
+            utility::LogError("Unsupported device.");
+        }
+
+        stdgpu::deregister_memory(p, n, stdgpu::dynamic_memory_type::device);
+        std_allocator_.deallocate(p, n);
+    }
+
+    /// Returns true if the instances are equal, false otherwise.
+    bool operator==(const StdGPUAllocator& other) {
+        return std_allocator_ == other.std_allocator_;
+    }
+
+    /// Returns true if the instances are not equal, false otherwise.
+    bool operator!=(const StdGPUAllocator& other) { return !operator==(other); }
+
+    /// Returns the device on which memory is allocated.
+    Device GetDevice() const { return std_allocator_.GetDevice(); }
+
+private:
+    // Allow access in rebind constructor.
+    template <typename T2>
+    friend class StdGPUAllocator;
+
+    StdAllocator<T> std_allocator_;
+};
+
+// These typedefs must be defined outside of StdGPUHashmap to make them
+// accessible in raw CUDA kernels.
+template <typename Key>
+using InternalStdGPUHashmapAllocator =
+        StdGPUAllocator<thrust::pair<const Key, addr_t>>;
+
+template <typename Key, typename Hash>
+using InternalStdGPUHashmap =
+        stdgpu::unordered_map<Key,
+                              addr_t,
+                              Hash,
+                              stdgpu::equal_to<Key>,
+                              InternalStdGPUHashmapAllocator<Key>>;
+
 template <typename Key, typename Hash>
 class StdGPUHashmap : public DeviceHashmap {
 public:
@@ -75,18 +161,20 @@ public:
 
     int64_t GetActiveIndices(addr_t* output_indices) override;
 
+    void Clear() override;
+
     int64_t Size() const override;
 
     int64_t GetBucketCount() const override;
     std::vector<int64_t> BucketSizes() const override;
     float LoadFactor() const override;
 
-    stdgpu::unordered_map<Key, addr_t, Hash> GetImpl() const { return impl_; }
+    InternalStdGPUHashmap<Key, Hash> GetImpl() const { return impl_; }
 
 protected:
     // Use reference, since the structure itself is implicitly handled as a
     // pointer directly by stdgpu.
-    stdgpu::unordered_map<Key, addr_t, Hash> impl_;
+    InternalStdGPUHashmap<Key, Hash> impl_;
 
     CUDAHashmapBufferAccessor buffer_accessor_;
 
@@ -148,7 +236,7 @@ void StdGPUHashmap<Key, Hash>::Activate(const void* input_keys,
 
 // Need an explicit kernel for non-const access to map
 template <typename Key, typename Hash>
-__global__ void STDGPUFindKernel(stdgpu::unordered_map<Key, addr_t, Hash> map,
+__global__ void STDGPUFindKernel(InternalStdGPUHashmap<Key, Hash> map,
                                  CUDAHashmapBufferAccessor buffer_accessor,
                                  const Key* input_keys,
                                  addr_t* output_addrs,
@@ -169,18 +257,18 @@ void StdGPUHashmap<Key, Hash>::Find(const void* input_keys,
                                     addr_t* output_addrs,
                                     bool* output_masks,
                                     int64_t count) {
-    int threads = 32;
-    int blocks = (count + threads - 1) / threads;
+    uint32_t threads = 128;
+    uint32_t blocks = (count + threads - 1) / threads;
 
-    STDGPUFindKernel<<<blocks, threads>>>(impl_, buffer_accessor_,
-                                          static_cast<const Key*>(input_keys),
-                                          output_addrs, output_masks, count);
-    OPEN3D_CUDA_CHECK(cudaDeviceSynchronize());
+    STDGPUFindKernel<<<blocks, threads, 0, core::cuda::GetStream()>>>(
+            impl_, buffer_accessor_, static_cast<const Key*>(input_keys),
+            output_addrs, output_masks, count);
+    cuda::Synchronize(this->device_);
 }
 
 // Need an explicit kernel for non-const access to map
 template <typename Key, typename Hash>
-__global__ void STDGPUEraseKernel(stdgpu::unordered_map<Key, addr_t, Hash> map,
+__global__ void STDGPUEraseKernel(InternalStdGPUHashmap<Key, Hash> map,
                                   CUDAHashmapBufferAccessor buffer_accessor,
                                   const Key* input_keys,
                                   addr_t* output_addrs,
@@ -190,6 +278,11 @@ __global__ void STDGPUEraseKernel(stdgpu::unordered_map<Key, addr_t, Hash> map,
     if (tid >= count) return;
 
     Key key = input_keys[tid];
+    auto iter = map.find(key);
+    bool flag = (iter != map.end());
+    output_masks[tid] = flag;
+    output_addrs[tid] = flag ? iter->second : 0;
+
     if (output_masks[tid]) {
         output_masks[tid] = map.erase(key);
         if (output_masks[tid]) {
@@ -202,23 +295,17 @@ template <typename Key, typename Hash>
 void StdGPUHashmap<Key, Hash>::Erase(const void* input_keys,
                                      bool* output_masks,
                                      int64_t count) {
-    stdgpu::index_t threads = 32;
-    stdgpu::index_t blocks = (count + threads - 1) / threads;
+    uint32_t threads = 128;
+    uint32_t blocks = (count + threads - 1) / threads;
 
-    // Erase has to go in two passes -- find the iterator, then erase and free
-    // Not frequently used, may not be fully optimized due to the tricky
-    // iterator change in the erase operation
     core::Tensor toutput_addrs =
-            core::Tensor({count}, Dtype::Int32, this->device_);
+            core::Tensor({count}, core::Int32, this->device_);
     addr_t* output_addrs = static_cast<addr_t*>(toutput_addrs.GetDataPtr());
 
-    STDGPUFindKernel<<<blocks, threads>>>(impl_, buffer_accessor_,
-                                          static_cast<const Key*>(input_keys),
-                                          output_addrs, output_masks, count);
-    STDGPUEraseKernel<<<blocks, threads>>>(impl_, buffer_accessor_,
-                                           static_cast<const Key*>(input_keys),
-                                           output_addrs, output_masks, count);
-    OPEN3D_CUDA_CHECK(cudaDeviceSynchronize());
+    STDGPUEraseKernel<<<blocks, threads, 0, core::cuda::GetStream()>>>(
+            impl_, buffer_accessor_, static_cast<const Key*>(input_keys),
+            output_addrs, output_masks, count);
+    cuda::Synchronize(this->device_);
 }
 
 template <typename Key>
@@ -240,6 +327,12 @@ int64_t StdGPUHashmap<Key, Hash>::GetActiveIndices(addr_t* output_indices) {
 }
 
 template <typename Key, typename Hash>
+void StdGPUHashmap<Key, Hash>::Clear() {
+    impl_.clear();
+    buffer_accessor_.Reset(this->device_);
+}
+
+template <typename Key, typename Hash>
 void StdGPUHashmap<Key, Hash>::Rehash(int64_t buckets) {
     int64_t iterator_count = Size();
 
@@ -247,10 +340,10 @@ void StdGPUHashmap<Key, Hash>::Rehash(int64_t buckets) {
     Tensor active_values;
 
     if (iterator_count > 0) {
-        Tensor active_addrs({iterator_count}, Dtype::Int32, this->device_);
+        Tensor active_addrs({iterator_count}, core::Int32, this->device_);
         GetActiveIndices(static_cast<addr_t*>(active_addrs.GetDataPtr()));
 
-        Tensor active_indices = active_addrs.To(Dtype::Int64);
+        Tensor active_indices = active_addrs.To(core::Int64);
         active_keys = this->GetKeyBuffer().IndexGet({active_indices});
         active_values = this->GetValueBuffer().IndexGet({active_indices});
     }
@@ -258,13 +351,14 @@ void StdGPUHashmap<Key, Hash>::Rehash(int64_t buckets) {
     float avg_capacity_per_bucket =
             float(this->capacity_) / float(GetBucketCount());
 
+    Free();
     int64_t new_capacity =
             int64_t(std::ceil(buckets * avg_capacity_per_bucket));
     Allocate(new_capacity);
 
     if (iterator_count > 0) {
-        Tensor output_addrs({iterator_count}, Dtype::Int32, this->device_);
-        Tensor output_masks({iterator_count}, Dtype::Bool, this->device_);
+        Tensor output_addrs({iterator_count}, core::Int32, this->device_);
+        Tensor output_masks({iterator_count}, core::Bool, this->device_);
 
         InsertImpl(active_keys.GetDataPtr(), active_values.GetDataPtr(),
                    static_cast<addr_t*>(output_addrs.GetDataPtr()),
@@ -289,7 +383,7 @@ float StdGPUHashmap<Key, Hash>::LoadFactor() const {
 
 // Need an explicit kernel for non-const access to map
 template <typename Key, typename Hash>
-__global__ void STDGPUInsertKernel(stdgpu::unordered_map<Key, addr_t, Hash> map,
+__global__ void STDGPUInsertKernel(InternalStdGPUHashmap<Key, Hash> map,
                                    CUDAHashmapBufferAccessor buffer_accessor,
                                    const Key* input_keys,
                                    const void* input_values,
@@ -342,14 +436,14 @@ void StdGPUHashmap<Key, Hash>::InsertImpl(const void* input_keys,
                                           addr_t* output_addrs,
                                           bool* output_masks,
                                           int64_t count) {
-    stdgpu::index_t threads = 32;
-    stdgpu::index_t blocks = (count + threads - 1) / threads;
+    uint32_t threads = 128;
+    uint32_t blocks = (count + threads - 1) / threads;
 
-    STDGPUInsertKernel<<<blocks, threads>>>(impl_, buffer_accessor_,
-                                            static_cast<const Key*>(input_keys),
-                                            input_values, this->dsize_value_,
-                                            output_addrs, output_masks, count);
-    OPEN3D_CUDA_CHECK(cudaDeviceSynchronize());
+    STDGPUInsertKernel<<<blocks, threads, 0, core::cuda::GetStream()>>>(
+            impl_, buffer_accessor_, static_cast<const Key*>(input_keys),
+            input_values, this->dsize_value_, output_addrs, output_masks,
+            count);
+    cuda::Synchronize(this->device_);
 }
 
 template <typename Key, typename Hash>
@@ -368,8 +462,16 @@ void StdGPUHashmap<Key, Hash>::Allocate(int64_t capacity) {
                            this->buffer_->GetHeap());
     buffer_accessor_.Reset(this->device_);
 
-    impl_ = stdgpu::unordered_map<Key, addr_t, Hash>::createDeviceObject(
-            this->capacity_);
+    // stdgpu initializes on the default stream. Set the current stream to
+    // ensure correct behavior.
+    {
+        CUDAScopedStream scoped_stream(cuda::GetDefaultStream());
+
+        impl_ = InternalStdGPUHashmap<Key, Hash>::createDeviceObject(
+                this->capacity_,
+                InternalStdGPUHashmapAllocator<Key>(this->device_));
+        cuda::Synchronize(this->device_);
+    }
 }
 
 template <typename Key, typename Hash>
@@ -378,7 +480,13 @@ void StdGPUHashmap<Key, Hash>::Free() {
 
     buffer_accessor_.HostFree(this->device_);
 
-    stdgpu::unordered_map<Key, addr_t, Hash>::destroyDeviceObject(impl_);
+    // stdgpu initializes on the default stream. Set the current stream to
+    // ensure correct behavior.
+    {
+        CUDAScopedStream scoped_stream(cuda::GetDefaultStream());
+
+        InternalStdGPUHashmap<Key, Hash>::destroyDeviceObject(impl_);
+    }
 }
 }  // namespace core
 }  // namespace open3d

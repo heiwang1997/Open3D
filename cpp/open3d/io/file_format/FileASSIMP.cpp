@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // The MIT License (MIT)
 //
-// Copyright (c) 2020 www.open3d.org
+// Copyright (c) 2018-2021 www.open3d.org
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -37,8 +37,8 @@
 #include "open3d/io/ImageIO.h"
 #include "open3d/io/ModelIO.h"
 #include "open3d/io/TriangleMeshIO.h"
-#include "open3d/utility/Console.h"
 #include "open3d/utility/FileSystem.h"
+#include "open3d/utility/Logging.h"
 #include "open3d/utility/ProgressReporters.h"
 #include "open3d/visualization/rendering/Material.h"
 #include "open3d/visualization/rendering/Model.h"
@@ -56,11 +56,9 @@ FileGeometry ReadFileGeometryTypeFBX(const std::string& path) {
 }
 
 const unsigned int kPostProcessFlags =
-        aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices |
-        aiProcess_ImproveCacheLocality | aiProcess_RemoveRedundantMaterials |
+        aiProcess_GenNormals | aiProcess_RemoveRedundantMaterials |
         aiProcess_Triangulate | aiProcess_GenUVCoords | aiProcess_SortByPType |
-        aiProcess_FindDegenerates | aiProcess_OptimizeMeshes |
-        aiProcess_PreTransformVertices;
+        aiProcess_OptimizeMeshes | aiProcess_PreTransformVertices;
 
 struct TextureImages {
     std::shared_ptr<geometry::Image> albedo;

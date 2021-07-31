@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // The MIT License (MIT)
 //
-// Copyright (c) 2018 www.open3d.org
+// Copyright (c) 2018-2021 www.open3d.org
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -25,8 +25,9 @@
 // ----------------------------------------------------------------------------
 
 #include "open3d/core/Dispatch.h"
+#include "open3d/core/Indexer.h"
+#include "open3d/core/ParallelFor.h"
 #include "open3d/core/Tensor.h"
-#include "open3d/core/kernel/CPULauncher.h"
 #include "open3d/core/linalg/TriImpl.h"
 
 namespace open3d {
@@ -41,14 +42,13 @@ void TriuCPU(const Tensor &A, Tensor &output, const int diagonal) {
         int cols = A.GetShape()[1];
         int n = A.GetShape()[0] * cols;
 
-        core::kernel::CPULauncher::LaunchGeneralKernel(
-                n, [&] OPEN3D_DEVICE(int64_t workload_idx) {
-                    const int64_t idx = workload_idx / cols;
-                    const int64_t idy = workload_idx % cols;
-                    if (idy - idx >= diagonal) {
-                        output_ptr[workload_idx] = A_ptr[idx * cols + idy];
-                    }
-                });
+        ParallelFor(A.GetDevice(), n, [&] OPEN3D_DEVICE(int64_t workload_idx) {
+            const int64_t idx = workload_idx / cols;
+            const int64_t idy = workload_idx % cols;
+            if (idy - idx >= diagonal) {
+                output_ptr[workload_idx] = A_ptr[idx * cols + idy];
+            }
+        });
     });
 }
 
@@ -61,14 +61,13 @@ void TrilCPU(const Tensor &A, Tensor &output, const int diagonal) {
         int cols = A.GetShape()[1];
         int n = A.GetShape()[0] * cols;
 
-        core::kernel::CPULauncher::LaunchGeneralKernel(
-                n, [&] OPEN3D_DEVICE(int64_t workload_idx) {
-                    const int64_t idx = workload_idx / cols;
-                    const int64_t idy = workload_idx % cols;
-                    if (idy - idx <= diagonal) {
-                        output_ptr[workload_idx] = A_ptr[idx * cols + idy];
-                    }
-                });
+        ParallelFor(A.GetDevice(), n, [&] OPEN3D_DEVICE(int64_t workload_idx) {
+            const int64_t idx = workload_idx / cols;
+            const int64_t idy = workload_idx % cols;
+            if (idy - idx <= diagonal) {
+                output_ptr[workload_idx] = A_ptr[idx * cols + idy];
+            }
+        });
     });
 }
 
@@ -85,19 +84,18 @@ void TriulCPU(const Tensor &A,
         int cols = A.GetShape()[1];
         int n = A.GetShape()[0] * cols;
 
-        core::kernel::CPULauncher::LaunchGeneralKernel(
-                n, [&] OPEN3D_DEVICE(int64_t workload_idx) {
-                    const int64_t idx = workload_idx / cols;
-                    const int64_t idy = workload_idx % cols;
-                    if (idy - idx < diagonal) {
-                        lower_ptr[workload_idx] = A_ptr[idx * cols + idy];
-                    } else if (idy - idx > diagonal) {
-                        upper_ptr[workload_idx] = A_ptr[idx * cols + idy];
-                    } else {
-                        lower_ptr[workload_idx] = 1;
-                        upper_ptr[workload_idx] = A_ptr[idx * cols + idy];
-                    }
-                });
+        ParallelFor(A.GetDevice(), n, [&] OPEN3D_DEVICE(int64_t workload_idx) {
+            const int64_t idx = workload_idx / cols;
+            const int64_t idy = workload_idx % cols;
+            if (idy - idx < diagonal) {
+                lower_ptr[workload_idx] = A_ptr[idx * cols + idy];
+            } else if (idy - idx > diagonal) {
+                upper_ptr[workload_idx] = A_ptr[idx * cols + idy];
+            } else {
+                lower_ptr[workload_idx] = 1;
+                upper_ptr[workload_idx] = A_ptr[idx * cols + idy];
+            }
+        });
     });
 }
 

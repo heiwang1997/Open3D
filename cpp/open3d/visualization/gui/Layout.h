@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // The MIT License (MIT)
 //
-// Copyright (c) 2021 www.open3d.org
+// Copyright (c) 2018-2021 www.open3d.org
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -64,7 +64,7 @@ public:
     enum Dir { VERT, HORIZ };
 
     static void debug_PrintPreferredSizes(Layout1D* layout,
-                                          const Theme& theme,
+                                          const LayoutContext& context,
                                           const Constraints& constraints,
                                           int depth = 0);
 
@@ -85,9 +85,9 @@ public:
     /// before a layout that will happen, such as before adding as a child).
     void SetMargins(const Margins& margins);
 
-    Size CalcPreferredSize(const Theme& theme,
+    Size CalcPreferredSize(const LayoutContext& context,
                            const Constraints& constraints) const override;
-    void Layout(const Theme& theme) override;
+    void Layout(const LayoutContext& context) override;
 
     /// Adds a fixed number of pixels after the previously added widget.
     void AddFixed(int size);
@@ -101,7 +101,7 @@ public:
     class Fixed : public Widget {
     public:
         Fixed(int size, Dir dir);
-        Size CalcPreferredSize(const Theme& theme,
+        Size CalcPreferredSize(const LayoutContext& context,
                                const Constraints& constraints) const override;
 
     private:
@@ -110,7 +110,7 @@ public:
     };
 
     class Stretch : public Widget {
-        Size CalcPreferredSize(const Theme& theme,
+        Size CalcPreferredSize(const LayoutContext& context,
                                const Constraints& constraints) const override;
     };
 
@@ -163,9 +163,34 @@ public:
     /// the window is shown.)
     void SetIsOpen(bool is_open);
 
-    Size CalcPreferredSize(const Theme& theme,
+    /// Returns true if open and false if collapsed.
+    bool GetIsOpen();
+
+    FontId GetFontId() const;
+    void SetFontId(FontId font_id);
+
+    Size CalcPreferredSize(const LayoutContext& context,
                            const Constraints& constraints) const override;
-    void Layout(const Theme& theme) override;
+    void Layout(const LayoutContext& context) override;
+    Widget::DrawResult Draw(const DrawContext& context) override;
+
+private:
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
+};
+
+/// This a vertical layout that scrolls if it is smaller than its contents
+class ScrollableVert : public Vert {
+    using Super = Vert;
+
+public:
+    ScrollableVert();
+    ScrollableVert(int spacing, const Margins& margins = Margins());
+    ScrollableVert(int spacing,
+                   const Margins& margins,
+                   const std::vector<std::shared_ptr<Widget>>& children);
+    virtual ~ScrollableVert();
+
     Widget::DrawResult Draw(const DrawContext& context) override;
 
 private:
@@ -209,9 +234,9 @@ public:
     int GetPreferredWidth() const;
     void SetPreferredWidth(int w);
 
-    Size CalcPreferredSize(const Theme& theme,
+    Size CalcPreferredSize(const LayoutContext& context,
                            const Constraints& constraints) const override;
-    void Layout(const Theme& theme) override;
+    void Layout(const LayoutContext& context) override;
 
 private:
     struct Impl;

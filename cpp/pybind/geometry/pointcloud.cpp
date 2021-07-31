@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // The MIT License (MIT)
 //
-// Copyright (c) 2018 www.open3d.org
+// Copyright (c) 2018-2021 www.open3d.org
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -63,6 +63,8 @@ void pybind_pointcloud(py::module &m) {
                  "Returns ``True`` if the point cloud contains point normals.")
             .def("has_colors", &PointCloud::HasColors,
                  "Returns ``True`` if the point cloud contains point colors.")
+            .def("has_covariances", &PointCloud::HasCovariances,
+                 "Returns ``True`` if the point cloud contains covariances.")
             .def("normalize_normals", &PointCloud::NormalizeNormals,
                  "Normalize point normals to length 1.")
             .def("paint_uniform_color", &PointCloud::PaintUniformColor,
@@ -143,19 +145,27 @@ void pybind_pointcloud(py::module &m) {
             .def("compute_point_cloud_distance",
                  &PointCloud::ComputePointCloudDistance,
                  "For each point in the source point cloud, compute the "
-                 "distance to "
-                 "the target point cloud.",
+                 "distance to the target point cloud.",
                  "target"_a)
+            .def_static(
+                    "estimate_point_covariances",
+                    &PointCloud::EstimatePerPointCovariances,
+                    "Static function to compute the covariance matrix for "
+                    "each "
+                    "point in the given point cloud, doesn't change the input",
+                    "input"_a, "search_param"_a = KDTreeSearchParamKNN())
+            .def("estimate_covariances", &PointCloud::EstimateCovariances,
+                 "Function to compute the covariance matrix for each point "
+                 "in the point cloud",
+                 "search_param"_a = KDTreeSearchParamKNN())
             .def("compute_mean_and_covariance",
                  &PointCloud::ComputeMeanAndCovariance,
                  "Function to compute the mean and covariance matrix of a "
-                 "point "
-                 "cloud.")
+                 "point cloud.")
             .def("compute_mahalanobis_distance",
                  &PointCloud::ComputeMahalanobisDistance,
                  "Function to compute the Mahalanobis distance for points in a "
-                 "point "
-                 "cloud. See: "
+                 "point cloud. See: "
                  "https://en.wikipedia.org/wiki/Mahalanobis_distance.")
             .def("compute_nearest_neighbor_distance",
                  &PointCloud::ComputeNearestNeighborDistance,
@@ -185,28 +195,26 @@ void pybind_pointcloud(py::module &m) {
                     "create_from_depth_image",
                     &PointCloud::CreateFromDepthImage,
                     R"(Factory function to create a pointcloud from a depth image and a
-        camera. Given depth value d at (u, v) image coordinate, the corresponding 3d
-        point is:
+camera. Given depth value d at (u, v) image coordinate, the corresponding 3d point is:
 
-              - z = d / depth_scale
-              - x = (u - cx) * z / fx
-              - y = (v - cy) * z / fy
-        )",
+    - z = d / depth_scale
+    - x = (u - cx) * z / fx
+    - y = (v - cy) * z / fy)",
                     "depth"_a, "intrinsic"_a,
                     "extrinsic"_a = Eigen::Matrix4d::Identity(),
                     "depth_scale"_a = 1000.0, "depth_trunc"_a = 1000.0,
                     "stride"_a = 1, "project_valid_depth_only"_a = true)
-            .def_static("create_from_rgbd_image",
-                        &PointCloud::CreateFromRGBDImage,
-                        "Factory function to create a pointcloud from an RGB-D "
-                        "image and a        camera. Given depth value d at (u, "
-                        "v) image coordinate, the corresponding 3d point is: "
-                        R"(- z = d / depth_scale
-              - x = (u - cx) * z / fx
-              - y = (v - cy) * z / fy)",
-                        "image"_a, "intrinsic"_a,
-                        "extrinsic"_a = Eigen::Matrix4d::Identity(),
-                        "project_valid_depth_only"_a = true)
+            .def_static(
+                    "create_from_rgbd_image", &PointCloud::CreateFromRGBDImage,
+                    "Factory function to create a pointcloud from an RGB-D "
+                    "image and a camera. Given depth value d at (u, "
+                    "v) image coordinate, the corresponding 3d point is:\n\n"
+                    R"(    - z = d / depth_scale
+    - x = (u - cx) * z / fx
+    - y = (v - cy) * z / fy)",
+                    "image"_a, "intrinsic"_a,
+                    "extrinsic"_a = Eigen::Matrix4d::Identity(),
+                    "project_valid_depth_only"_a = true)
             .def_readwrite("points", &PointCloud::points_,
                            "``float64`` array of shape ``(num_points, 3)``, "
                            "use ``numpy.asarray()`` to access data: Points "
@@ -219,7 +227,11 @@ void pybind_pointcloud(py::module &m) {
                     "colors", &PointCloud::colors_,
                     "``float64`` array of shape ``(num_points, 3)``, "
                     "range ``[0, 1]`` , use ``numpy.asarray()`` to access "
-                    "data: RGB colors of points.");
+                    "data: RGB colors of points.")
+            .def_readwrite("covariances", &PointCloud::covariances_,
+                           "``float64`` array of shape ``(num_points, 3, 3)``, "
+                           "use ``numpy.asarray()`` to access data: Points "
+                           "covariances.");
     docstring::ClassMethodDocInject(m, "PointCloud", "has_colors");
     docstring::ClassMethodDocInject(m, "PointCloud", "has_normals");
     docstring::ClassMethodDocInject(m, "PointCloud", "has_points");
@@ -290,6 +302,15 @@ void pybind_pointcloud(py::module &m) {
     docstring::ClassMethodDocInject(m, "PointCloud",
                                     "compute_point_cloud_distance",
                                     {{"target", "The target point cloud."}});
+    docstring::ClassMethodDocInject(
+            m, "PointCloud", "estimate_point_covariances",
+            {{"input", "The input point cloud."},
+             {"search_param",
+              "The KDTree search parameters for neighborhood search."}});
+    docstring::ClassMethodDocInject(
+            m, "PointCloud", "estimate_covariances",
+            {{"search_param",
+              "The KDTree search parameters for neighborhood search."}});
     docstring::ClassMethodDocInject(m, "PointCloud",
                                     "compute_mean_and_covariance");
     docstring::ClassMethodDocInject(m, "PointCloud",

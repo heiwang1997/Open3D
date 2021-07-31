@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // The MIT License (MIT)
 //
-// Copyright (c) 2018 www.open3d.org
+// Copyright (c) 2018-2021 www.open3d.org
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -42,7 +42,7 @@ public:
     /// Constructor for primitive types, supporting element shapes.
     /// Example:
     /// Key is int<3> coordinate:
-    /// - dtype_key = Dtype::Int32
+    /// - dtype_key = core::Int32
     /// - element_shape_key = {3}
     Hashmap(int64_t init_capacity,
             const Dtype& dtype_key,
@@ -62,9 +62,9 @@ public:
     void Rehash(int64_t buckets);
 
     /// Parallel insert arrays of keys and values in Tensors.
-    /// Return \addrs: internal indices that can be directly used for advanced
+    /// Return addrs: internal indices that can be directly used for advanced
     /// indexing in Tensor key/value buffers.
-    /// \masks: success insertions, must be combined with \addrs in advanced
+    /// masks: success insertions, must be combined with addrs in advanced
     /// indexing.
     void Insert(const Tensor& input_keys,
                 const Tensor& input_values,
@@ -74,18 +74,18 @@ public:
     /// Parallel activate arrays of keys in Tensor.
     /// Specifically useful for large value elements (e.g., a tensor), where we
     /// can do in-place management after activation.
-    /// Return \addrs: internal indices that can be directly used for advanced
+    /// Return addrs: internal indices that can be directly used for advanced
     /// indexing in Tensor key/value buffers.
-    /// \masks: success insertions, must be combined with \addrs in advanced
+    /// masks: success insertions, must be combined with addrs in advanced
     /// indexing.
     void Activate(const Tensor& input_keys,
                   Tensor& output_addrs,
                   Tensor& output_masks);
 
     /// Parallel find an array of keys in Tensor.
-    /// Return \addrs: internal indices that can be directly used for advanced
+    /// Return addrs: internal indices that can be directly used for advanced
     /// indexing in Tensor key/value buffers.
-    /// \masks: success insertions, must be combined with \addrs in advanced
+    /// masks: success insertions, must be combined with addrs in advanced
     /// indexing.
     void Find(const Tensor& input_keys,
               Tensor& output_addrs,
@@ -93,14 +93,17 @@ public:
 
     /// Parallel erase an array of keys in Tensor.
     /// Output masks is a bool Tensor.
-    /// Return \masks: success insertions, must be combined with \addrs in
+    /// Return masks: success insertions, must be combined with addrs in
     /// advanced indexing.
     void Erase(const Tensor& input_keys, Tensor& output_masks);
 
     /// Parallel collect all iterators in the hash table
-    /// Return \addrs: internal indices that can be directly used for advanced
+    /// Return addrs: internal indices that can be directly used for advanced
     /// indexing in Tensor key/value buffers.
     void GetActiveIndices(Tensor& output_indices) const;
+
+    /// Clear stored map without reallocating memory.
+    void Clear();
 
     Hashmap Clone() const;
     Hashmap To(const Device& device, bool copy = false) const;

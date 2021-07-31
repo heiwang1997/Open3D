@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // The MIT License (MIT)
 //
-// Copyright (c) 2018 www.open3d.org
+// Copyright (c) 2018-2021 www.open3d.org
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -33,6 +33,7 @@
 
 #include "open3d/core/hashmap/CPU/CPUHashmapBufferAccessor.hpp"
 #include "open3d/core/hashmap/DeviceHashmap.h"
+#include "open3d/utility/Parallel.h"
 
 namespace open3d {
 namespace core {
@@ -68,6 +69,8 @@ public:
                int64_t count) override;
 
     int64_t GetActiveIndices(addr_t* output_indices) override;
+
+    void Clear() override;
 
     int64_t Size() const override;
     int64_t GetBucketCount() const override;
@@ -146,7 +149,7 @@ void TBBHashmap<Key, Hash>::Find(const void* input_keys,
                                  int64_t count) {
     const Key* input_keys_templated = static_cast<const Key*>(input_keys);
 
-#pragma omp parallel for
+#pragma omp parallel for num_threads(utility::EstimateMaxThreads())
     for (int64_t i = 0; i < count; ++i) {
         const Key& key = input_keys_templated[i];
 
@@ -188,6 +191,12 @@ int64_t TBBHashmap<Key, Hash>::GetActiveIndices(addr_t* output_indices) {
 }
 
 template <typename Key, typename Hash>
+void TBBHashmap<Key, Hash>::Clear() {
+    impl_->clear();
+    buffer_ctx_->Reset();
+}
+
+template <typename Key, typename Hash>
 void TBBHashmap<Key, Hash>::Rehash(int64_t buckets) {
     int64_t iterator_count = Size();
 
@@ -195,10 +204,10 @@ void TBBHashmap<Key, Hash>::Rehash(int64_t buckets) {
     Tensor active_values;
 
     if (iterator_count > 0) {
-        Tensor active_addrs({iterator_count}, Dtype::Int32, this->device_);
+        Tensor active_addrs({iterator_count}, core::Int32, this->device_);
         GetActiveIndices(static_cast<addr_t*>(active_addrs.GetDataPtr()));
 
-        Tensor active_indices = active_addrs.To(Dtype::Int64);
+        Tensor active_indices = active_addrs.To(core::Int64);
         active_keys = this->GetKeyBuffer().IndexGet({active_indices});
         active_values = this->GetValueBuffer().IndexGet({active_indices});
     }
@@ -211,8 +220,8 @@ void TBBHashmap<Key, Hash>::Rehash(int64_t buckets) {
     Allocate(new_capacity);
 
     if (iterator_count > 0) {
-        Tensor output_addrs({iterator_count}, Dtype::Int32, this->device_);
-        Tensor output_masks({iterator_count}, Dtype::Bool, this->device_);
+        Tensor output_addrs({iterator_count}, core::Int32, this->device_);
+        Tensor output_masks({iterator_count}, core::Bool, this->device_);
 
         InsertImpl(active_keys.GetDataPtr(), active_values.GetDataPtr(),
                    static_cast<addr_t*>(output_addrs.GetDataPtr()),
@@ -250,7 +259,7 @@ void TBBHashmap<Key, Hash>::InsertImpl(const void* input_keys,
                                        int64_t count) {
     const Key* input_keys_templated = static_cast<const Key*>(input_keys);
 
-#pragma omp parallel for
+#pragma omp parallel for num_threads(utility::EstimateMaxThreads())
     for (int64_t i = 0; i < count; ++i) {
         output_addrs[i] = 0;
         output_masks[i] = false;
