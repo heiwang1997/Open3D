@@ -27,6 +27,8 @@
 #pragma once
 
 #include "pybind/open3d_pybind.h"
+#include "open3d/visualization/gui/Widget.h"
+#include "open3d/visualization/gui/SceneWidget.h"
 
 namespace open3d {
 namespace geometry {
@@ -39,6 +41,65 @@ class Open3DScene;
 }
 
 namespace gui {
+
+
+enum class EventCallbackResult { IGNORED = 0, HANDLED, CONSUMED };
+
+    class PySceneWidget : public SceneWidget {
+        using Super = SceneWidget;
+
+    public:
+        void SetOnMouse(std::function<int(const MouseEvent &)> f) {
+            on_mouse_ = f;
+        }
+        void SetOnKey(std::function<int(const KeyEvent &)> f) { on_key_ = f; }
+
+        Widget::EventResult Mouse(const MouseEvent &e) override {
+            if (on_mouse_) {
+                switch (EventCallbackResult(on_mouse_(e))) {
+                    case EventCallbackResult::CONSUMED:
+                        return Widget::EventResult::CONSUMED;
+                    case EventCallbackResult::HANDLED: {
+                        auto result = Super::Mouse(e);
+                        if (result == Widget::EventResult::IGNORED) {
+                            result = Widget::EventResult::CONSUMED;
+                        }
+                        return result;
+                    }
+                    case EventCallbackResult::IGNORED:
+                    default:
+                        return Super::Mouse(e);
+                }
+            } else {
+                return Super::Mouse(e);
+            }
+        }
+
+        Widget::EventResult Key(const KeyEvent &e) override {
+            if (on_key_) {
+                switch (EventCallbackResult(on_key_(e))) {
+                    case EventCallbackResult::CONSUMED:
+                        return Widget::EventResult::CONSUMED;
+                    case EventCallbackResult::HANDLED: {
+                        auto result = Super::Key(e);
+                        if (result == Widget::EventResult::IGNORED) {
+                            result = Widget::EventResult::CONSUMED;
+                        }
+                        return result;
+                    }
+                    case EventCallbackResult::IGNORED:
+                    default:
+                        return Super::Key(e);
+                }
+            } else {
+                return Super::Key(e);
+            }
+        }
+
+    private:
+        std::function<int(const MouseEvent &)> on_mouse_;
+        std::function<int(const KeyEvent &)> on_key_;
+    };
 
 void InitializeForPython(std::string resource_path = "");
 std::shared_ptr<geometry::Image> RenderToImageWithoutWindow(

@@ -47,6 +47,10 @@ class Geometry;
 
 namespace visualization {
 
+namespace gui {
+class SceneWidget;
+}
+
 namespace rendering {
 class Open3DScene;
 struct TriangleMeshModel;
@@ -104,7 +108,9 @@ public:
         double frame_delay = 0.100;  // seconds
     };
 
-    O3DVisualizer(const std::string& title, int width, int height);
+    // Jiahui: This allows pass in a PySceneWidget which we can control from outside.
+    O3DVisualizer(const std::string& title, int width, int height, gui::SceneWidget* scene_widget = nullptr);
+
     virtual ~O3DVisualizer();
 
     void AddAction(const std::string& name,
@@ -195,6 +201,7 @@ public:
 
     UIState GetUIState() const;
     rendering::Open3DScene* GetScene() const;
+    gui::SceneWidget* GetSceneWidget() const;
 
     /// Starts the RPC interface. See io/rpc/ReceiverBase for the parameters.
     void StartRPCInterface(const std::string& address, int timeout);

@@ -34,6 +34,7 @@
 #include "open3d/visualization/rendering/Model.h"
 #include "open3d/visualization/rendering/Open3DScene.h"
 #include "pybind/visualization/visualization.h"
+#include "pybind/visualization/gui/gui.h"
 
 namespace open3d {
 namespace visualization {
@@ -120,8 +121,8 @@ void pybind_o3dvisualizer(py::module& m) {
                           "visiblity may not correspond with this "
                           "value");
 
-    o3dvis.def(py::init<const std::string, int, int>(), "title"_a = "Open3D",
-               "width"_a = 1024, "height"_a = 768,
+    o3dvis.def(py::init<const std::string, int, int, gui::PySceneWidget*>(), "title"_a = "Open3D",
+               "width"_a = 1024, "height"_a = 768, "scene_widget"_a = nullptr,
                "Creates a O3DVisualizer object")
             // selected functions inherited from Window
             .def_property("os_frame", &O3DVisualizer::GetOSFrame,
@@ -390,6 +391,8 @@ void pybind_o3dvisualizer(py::module& m) {
             .def_property_readonly("scene", &O3DVisualizer::GetScene,
                                    "Returns the rendering.Open3DScene object "
                                    "for low-level manipulation")
+            .def_property_readonly("scene_widget", &O3DVisualizer::GetSceneWidget,
+                                   "Return the scene widget for widget-level control")
             .def_property(
                     "current_time",
                     // MSVC doesn't like this for some reason

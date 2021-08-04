@@ -308,6 +308,7 @@ struct O3DVisualizer::Impl {
     std::shared_ptr<Receiver> receiver_;
 
     UIState ui_state_;
+    bool has_external_scene_widget = false;
     bool can_auto_show_settings_ = true;
 
     double min_time_ = 0.0;
@@ -379,13 +380,20 @@ struct O3DVisualizer::Impl {
         ButtonList *actions;
     } settings;
 
-    void Construct(O3DVisualizer *w) {
+    void Construct(O3DVisualizer *w, gui::SceneWidget *sw) {
         if (window_) {
             return;
         }
 
         window_ = w;
-        scene_ = new SceneWidget();
+
+        // External widget is managed by GC.
+        if (sw) {
+            has_external_scene_widget = true;
+            scene_ = sw;
+        } else {
+            scene_ = new SceneWidget();
+        }
         selections_ = std::make_shared<O3DVisualizerSelections>(*scene_);
         scene_->SetScene(std::make_shared<Open3DScene>(w->GetRenderer()));
         scene_->EnableSceneCaching(true);  // smoother UI with large geometry
@@ -1805,9 +1813,9 @@ struct O3DVisualizer::Impl {
 };
 
 // ----------------------------------------------------------------------------
-O3DVisualizer::O3DVisualizer(const std::string &title, int width, int height)
+O3DVisualizer::O3DVisualizer(const std::string &title, int width, int height, gui::SceneWidget* scene_widget)
     : Window(title, width, height), impl_(new O3DVisualizer::Impl()) {
-    impl_->Construct(this);
+    impl_->Construct(this, scene_widget);
 
     // Create the app menu. We will take over the existing menubar (if any)
     // since a) we need to cache a pointer, and b) we should be the only
@@ -1858,6 +1866,10 @@ O3DVisualizer::~O3DVisualizer() {}
 
 Open3DScene *O3DVisualizer::GetScene() const {
     return impl_->scene_->GetScene().get();
+}
+
+SceneWidget *O3DVisualizer::GetSceneWidget() const {
+    return impl_->scene_;
 }
 
 void O3DVisualizer::StartRPCInterface(const std::string &address, int timeout) {
