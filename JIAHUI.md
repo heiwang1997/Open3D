@@ -2,8 +2,8 @@
 
 ## NOTE
 
-Last time I seemed to stage 3rdparty files. Check that out.
-I haven't commit the last changes.
+I will work on my master branch, and merge with upstream using the following command.
+List all files without untracked ones with `gst -uno`
 
 ## Merging with upstream head
 
