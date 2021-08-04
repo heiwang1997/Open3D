@@ -230,6 +230,17 @@ void Visualizer::RegisterAnimationCallback(
     animation_callback_func_ = callback_func;
 }
 
+void Visualizer::RegisterViewRefreshCallback(
+        std::function<bool(Visualizer *)> callback_func) {
+    view_refresh_callback_ = callback_func;
+}
+
+void Visualizer::ViewRefreshCallback(GLFWwindow *window) {
+    if (view_refresh_callback_) {
+        view_refresh_callback_(this);
+    }
+}
+
 bool Visualizer::InitViewControl() {
     view_control_ptr_ = std::unique_ptr<ViewControl>(new ViewControl);
     ResetViewPoint();

@@ -81,6 +81,9 @@ void pybind_visualizer(py::module &m) {
                  "callback function returns if UpdateGeometry() needs to be "
                  "run.",
                  "callback_func"_a)
+            .def("register_view_refresh_callback",
+                 &Visualizer::RegisterViewRefreshCallback,
+                 "Jiahui added. Will be called when view is refreshed.", "callback_func"_a)
             .def("run", &Visualizer::Run,
                  "Function to activate the window. This function will block "
                  "the current thread until the window is closed.")

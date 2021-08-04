@@ -67,6 +67,7 @@ void Visualizer::MouseMoveCallback(GLFWwindow *window, double x, double y) {
                                       mouse_control_.mouse_position_y);
         }
         is_redraw_required_ = true;
+        this->ViewRefreshCallback(window);
     }
     if (mouse_control_.is_mouse_middle_button_down) {
         view_control_ptr_->Translate(x - mouse_control_.mouse_position_x,
@@ -74,6 +75,7 @@ void Visualizer::MouseMoveCallback(GLFWwindow *window, double x, double y) {
                                      mouse_control_.mouse_position_x,
                                      mouse_control_.mouse_position_y);
         is_redraw_required_ = true;
+        this->ViewRefreshCallback(window);
     }
     mouse_control_.mouse_position_x = x;
     mouse_control_.mouse_position_y = y;
@@ -81,6 +83,7 @@ void Visualizer::MouseMoveCallback(GLFWwindow *window, double x, double y) {
 
 void Visualizer::MouseScrollCallback(GLFWwindow *window, double x, double y) {
     view_control_ptr_->Scale(y);
+    this->ViewRefreshCallback(window);
     is_redraw_required_ = true;
 }
 
@@ -138,15 +141,18 @@ void Visualizer::KeyPressCallback(
             view_control_ptr_->ChangeFieldOfView(-1.0);
             utility::LogDebug("[Visualizer] Field of view set to {:.2f}.",
                               view_control_ptr_->GetFieldOfView());
+            this->ViewRefreshCallback(window);
             break;
         case GLFW_KEY_RIGHT_BRACKET:
             view_control_ptr_->ChangeFieldOfView(1.0);
             utility::LogDebug("[Visualizer] Field of view set to {:.2f}.",
                               view_control_ptr_->GetFieldOfView());
+            this->ViewRefreshCallback(window);
             break;
         case GLFW_KEY_R:
             ResetViewPoint();
             utility::LogDebug("[Visualizer] Reset view point.");
+            this->ViewRefreshCallback(window);
             break;
         case GLFW_KEY_C:
             if (mods & GLFW_MOD_CONTROL || mods & GLFW_MOD_SUPER) {
@@ -157,6 +163,7 @@ void Visualizer::KeyPressCallback(
             if (mods & GLFW_MOD_CONTROL || mods & GLFW_MOD_SUPER) {
                 CopyViewStatusFromClipboard();
             }
+            this->ViewRefreshCallback(window);
             break;
         case GLFW_KEY_ESCAPE:
         case GLFW_KEY_Q:

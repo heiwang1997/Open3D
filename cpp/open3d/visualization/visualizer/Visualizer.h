@@ -111,6 +111,11 @@ public:
     void RegisterAnimationCallback(
             std::function<bool(Visualizer *)> callback_func);
 
+    /// \brief JIAHUI adds a view refresh callback for sync views
+    /// \param callback_func The call back function.
+    void RegisterViewRefreshCallback(
+            std::function<bool(Visualizer *)> callback_func);
+
     /// \brief Function to activate the window.
     ///
     /// This function will block the current thread until the window is closed.
@@ -265,6 +270,8 @@ protected:
             GLFWwindow *window, int key, int scancode, int action, int mods);
     /// \brief Function to notify the window to be closed.
     virtual void WindowCloseCallback(GLFWwindow *window);
+    /// JIAHUI: This is a virtual callback to be called within callbacks.
+    virtual void ViewRefreshCallback(GLFWwindow *window);
 
 protected:
     // window
@@ -279,6 +286,8 @@ protected:
     // callback function it is still safe.
     std::function<bool(Visualizer *)> animation_callback_func_in_loop_ =
             nullptr;
+
+    std::function<bool(Visualizer *)> view_refresh_callback_ = nullptr;
 
     // control
     MouseControl mouse_control_;
