@@ -38,6 +38,7 @@
 #include <tuple>
 #include <vector>
 
+#include "open3d/core/TensorCheck.h"
 #include "open3d/utility/Helper.h"
 #include "open3d/utility/Logging.h"
 
@@ -59,7 +60,7 @@ void AssertTensorDtypeLastDimDeviceMinNDim(const open3d::core::Tensor& tensor,
                                            int64_t last_dim,
                                            const open3d::core::Device& device,
                                            int64_t min_ndim = 2) {
-    tensor.AssertDevice(device);
+    open3d::core::AssertTensorDevice(tensor, device);
     if (tensor.NumDims() < min_ndim) {
         open3d::utility::LogError(
                 "{} Tensor ndim is {} but expected ndim >= {}", tensor_name,
@@ -71,7 +72,8 @@ void AssertTensorDtypeLastDimDeviceMinNDim(const open3d::core::Tensor& tensor,
                 "Tensor with shape {}",
                 tensor_name, last_dim, tensor.GetShape().ToString());
     }
-    tensor.AssertDtype(open3d::core::Dtype::FromType<DTYPE>());
+    open3d::core::AssertTensorDtype(tensor,
+                                    open3d::core::Dtype::FromType<DTYPE>());
 }
 
 struct CountIntersectionsContext {
@@ -157,18 +159,18 @@ bool ClosestPointFunc(RTCPointQueryFunctionArguments* args) {
             std::get<2>(result->geometry_ptrs_ptr->operator[](geomID));
 
     if (RTC_GEOMETRY_TYPE_TRIANGLE == geom_type) {
-        const float* vertices = (const float*)ptr1;
-        const uint32_t* triangles = (const uint32_t*)ptr2;
+        const float* vertex_positions = (const float*)ptr1;
+        const uint32_t* triangle_indices = (const uint32_t*)ptr2;
 
-        Vec3fa v0(vertices[3 * triangles[3 * primID + 0] + 0],
-                  vertices[3 * triangles[3 * primID + 0] + 1],
-                  vertices[3 * triangles[3 * primID + 0] + 2]);
-        Vec3fa v1(vertices[3 * triangles[3 * primID + 1] + 0],
-                  vertices[3 * triangles[3 * primID + 1] + 1],
-                  vertices[3 * triangles[3 * primID + 1] + 2]);
-        Vec3fa v2(vertices[3 * triangles[3 * primID + 2] + 0],
-                  vertices[3 * triangles[3 * primID + 2] + 1],
-                  vertices[3 * triangles[3 * primID + 2] + 2]);
+        Vec3fa v0(vertex_positions[3 * triangle_indices[3 * primID + 0] + 0],
+                  vertex_positions[3 * triangle_indices[3 * primID + 0] + 1],
+                  vertex_positions[3 * triangle_indices[3 * primID + 0] + 2]);
+        Vec3fa v1(vertex_positions[3 * triangle_indices[3 * primID + 1] + 0],
+                  vertex_positions[3 * triangle_indices[3 * primID + 1] + 1],
+                  vertex_positions[3 * triangle_indices[3 * primID + 1] + 2]);
+        Vec3fa v2(vertex_positions[3 * triangle_indices[3 * primID + 2] + 0],
+                  vertex_positions[3 * triangle_indices[3 * primID + 2] + 1],
+                  vertex_positions[3 * triangle_indices[3 * primID + 2] + 2]);
 
         // Determine distance to closest point on triangle (implemented in
         // common/math/closest_point.h).
@@ -395,17 +397,17 @@ RaycastingScene::~RaycastingScene() {
     rtcReleaseDevice(impl_->device_);
 }
 
-uint32_t RaycastingScene::AddTriangles(const core::Tensor& vertices,
-                                       const core::Tensor& triangles) {
-    vertices.AssertDevice(impl_->tensor_device_);
-    vertices.AssertShapeCompatible({utility::nullopt, 3});
-    vertices.AssertDtype(core::Float32);
-    triangles.AssertDevice(impl_->tensor_device_);
-    triangles.AssertShapeCompatible({utility::nullopt, 3});
-    triangles.AssertDtype(core::UInt32);
+uint32_t RaycastingScene::AddTriangles(const core::Tensor& vertex_positions,
+                                       const core::Tensor& triangle_indices) {
+    core::AssertTensorDevice(vertex_positions, impl_->tensor_device_);
+    core::AssertTensorShape(vertex_positions, {utility::nullopt, 3});
+    core::AssertTensorDtype(vertex_positions, core::Float32);
+    core::AssertTensorDevice(triangle_indices, impl_->tensor_device_);
+    core::AssertTensorShape(triangle_indices, {utility::nullopt, 3});
+    core::AssertTensorDtype(triangle_indices, core::UInt32);
 
-    const size_t num_vertices = vertices.GetLength();
-    const size_t num_triangles = triangles.GetLength();
+    const size_t num_vertices = vertex_positions.GetLength();
+    const size_t num_triangles = triangle_indices.GetLength();
 
     // scene needs to be recommitted
     impl_->scene_committed_ = false;
@@ -422,12 +424,12 @@ uint32_t RaycastingScene::AddTriangles(const core::Tensor& vertices,
             3 * sizeof(uint32_t), num_triangles);
 
     {
-        auto data = vertices.Contiguous();
+        auto data = vertex_positions.Contiguous();
         memcpy(vertex_buffer, data.GetDataPtr(),
                sizeof(float) * 3 * num_vertices);
     }
     {
-        auto data = triangles.Contiguous();
+        auto data = triangle_indices.Contiguous();
         memcpy(index_buffer, data.GetDataPtr(),
                sizeof(uint32_t) * 3 * num_triangles);
     }
@@ -443,14 +445,14 @@ uint32_t RaycastingScene::AddTriangles(const core::Tensor& vertices,
 }
 
 uint32_t RaycastingScene::AddTriangles(const TriangleMesh& mesh) {
-    size_t num_verts = mesh.GetVertices().GetLength();
+    size_t num_verts = mesh.GetVertexPositions().GetLength();
     if (num_verts > std::numeric_limits<uint32_t>::max()) {
         utility::LogError(
                 "Cannot add mesh with more than {} vertices to the scene",
                 std::numeric_limits<uint32_t>::max());
     }
-    return AddTriangles(mesh.GetVertices(),
-                        mesh.GetTriangles().To(core::UInt32));
+    return AddTriangles(mesh.GetVertexPositions(),
+                        mesh.GetTriangleIndices().To(core::UInt32));
 }
 
 std::unordered_map<std::string, core::Tensor> RaycastingScene::CastRays(
@@ -608,10 +610,10 @@ core::Tensor RaycastingScene::CreateRaysPinhole(
         const core::Tensor& extrinsic_matrix,
         int width_px,
         int height_px) {
-    intrinsic_matrix.AssertDevice(core::Device());
-    intrinsic_matrix.AssertShape({3, 3});
-    extrinsic_matrix.AssertDevice(core::Device());
-    extrinsic_matrix.AssertShape({4, 4});
+    core::AssertTensorDevice(intrinsic_matrix, core::Device());
+    core::AssertTensorShape(intrinsic_matrix, {3, 3});
+    core::AssertTensorDevice(extrinsic_matrix, core::Device());
+    core::AssertTensorShape(extrinsic_matrix, {4, 4});
 
     auto intrinsic_matrix_contig =
             intrinsic_matrix.To(core::Float64).Contiguous();
@@ -653,12 +655,12 @@ core::Tensor RaycastingScene::CreateRaysPinhole(double fov_deg,
                                                 const core::Tensor& up,
                                                 int width_px,
                                                 int height_px) {
-    center.AssertDevice(core::Device());
-    center.AssertShape({3});
-    eye.AssertDevice(core::Device());
-    eye.AssertShape({3});
-    up.AssertDevice(core::Device());
-    up.AssertShape({3});
+    core::AssertTensorDevice(center, core::Device());
+    core::AssertTensorShape(center, {3});
+    core::AssertTensorDevice(eye, core::Device());
+    core::AssertTensorShape(eye, {3});
+    core::AssertTensorDevice(up, core::Device());
+    core::AssertTensorShape(up, {3});
 
     double focal_length =
             0.5 * width_px / std::tan(0.5 * (M_PI / 180) * fov_deg);

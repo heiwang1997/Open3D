@@ -1,9 +1,10 @@
 add_subdirectory(kernel)
 
-add_library(tgeometry OBJECT $<TARGET_OBJECTS:tgeometry_kernel>)
+open3d_ispc_add_library(tgeometry OBJECT)
 
 target_sources(tgeometry PRIVATE
     Image.cpp
+    LineSet.cpp
     PointCloud.cpp
     RaycastingScene.cpp
     RGBDImage.cpp
