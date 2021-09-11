@@ -91,3 +91,21 @@ docs/python_api/
 docs/conf.py
 docs/Doxyfile
 docs/getting_started.rst
+
+# 3rd-party libraries. (Added by Jiahui)
+3rdparty/Eigen/
+3rdparty/PoissonRecon/
+3rdparty/benchmark/
+3rdparty/cub/
+3rdparty/cutlass/
+3rdparty/fmt/
+3rdparty/googletest/
+3rdparty/imgui/
+3rdparty/nanoflann/
+3rdparty/parallelstl/
+3rdparty/open3d_sphinx_theme/
+3rdparty/pybind11/
+3rdparty/qhull/
+3rdparty/libjpeg-turbo/libjpeg-turbo/
+3rdparty/tinygltf/tinygltf/
+3rdparty/tinyobjloader/tinyobjloader/

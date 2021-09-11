@@ -35,3 +35,4 @@ make install-pip-package
 3. Add `o3dvisualizer.scene_widget` python binding to get the SceneWidget within the pre-built visualizer.
     - The original scene widget in the visualizer is a SceneWidget, which cannot be converted into python type. So I created a new parameter in the constructor of O3DVisualizer to accept an external widget pointer, which we pass in a PySceneWidget pointer.
     - In order to achieve this, we move PySceneWidget definition from `pybind/visualization/gui/gui.cpp` to `gui.h`, so that it can be referenced in `pybind/visualization/o3dvisualizer.cpp` and create the python compatible constructor.
+4. Add `register_view_refresh_callback` into the legacy `o3d.Visualizer` class, in order to capture camera moving events (to sync views from different windows).
