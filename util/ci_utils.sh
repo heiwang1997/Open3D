@@ -225,6 +225,7 @@ build_all() {
         -DBUILD_LIBREALSENSE=ON
         -DBUILD_CUDA_MODULE="$BUILD_CUDA_MODULE"
         -DBUILD_COMMON_CUDA_ARCHS=ON
+        -DBUILD_COMMON_ISPC_ISAS=ON
         -DBUILD_TENSORFLOW_OPS="$BUILD_TENSORFLOW_OPS"
         -DBUILD_PYTORCH_OPS="$BUILD_PYTORCH_OPS"
         -DCMAKE_INSTALL_PREFIX="$OPEN3D_INSTALL_DIR"
@@ -291,6 +292,7 @@ build_pip_conda_package() {
     pushd build # PWD=Open3D/build
     cmakeOptions=("-DBUILD_SHARED_LIBS=OFF"
         "-DDEVELOPER_BUILD=$DEVELOPER_BUILD"
+        "-DBUILD_COMMON_ISPC_ISAS=ON"
         "-DBUILD_AZURE_KINECT=$BUILD_AZURE_KINECT"
         "-DBUILD_LIBREALSENSE=ON"
         "-DBUILD_TENSORFLOW_OPS=ON"
@@ -396,8 +398,10 @@ test_wheel() {
 run_python_tests() {
     # shellcheck disable=SC1091
     source open3d_test.venv/bin/activate
-    python -m pip install -U scipy=="$SCIPY_VER" pytest=="$PYTEST_VER" \
-        pytest-randomly=="$PYTEST_RANDOMLY_VER"
+    python -m pip install -U pytest=="$PYTEST_VER" \
+        pytest-randomly=="$PYTEST_RANDOMLY_VER" \
+        scipy=="$SCIPY_VER" \
+        tensorboard=="$TENSORFLOW_VER"
     echo Add --rondomly-seed=SEED to the test command to reproduce test order.
     pytest_args=("$OPEN3D_SOURCE_ROOT"/python/test/)
     if [ "$BUILD_PYTORCH_OPS" == "OFF" ] || [ "$BUILD_TENSORFLOW_OPS" == "OFF" ]; then

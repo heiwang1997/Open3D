@@ -41,6 +41,7 @@ if(NOT LINUX_AARCH64)
 else()
     option(BUILD_ISPC_MODULE          "Build the ISPC module"                    OFF)
 endif()
+option(BUILD_COMMON_ISPC_ISAS     "Build for common ISPC ISAs (for release)" OFF)
 option(BUILD_GUI                  "Builds new GUI"                           ON )
 option(WITH_OPENMP                "Use OpenMP multi-threading"               ON )
 option(WITH_IPPICV                "Use Intel Performance Primitives"         ON )
@@ -309,9 +310,20 @@ add_compile_definitions("${HARDENING_DEFINITIONS}")
 
 # Explicitly specifiy the preference of using -pthread over -lpthread.
 # This must be defined here since CUDA calls find_package(Threads) internally.
-# -pthread is disabled since some compilers, e.g. the ISPC compiler, have
-# problems with this compile flag and issue errors.
-set(THREADS_PREFER_PTHREAD_FLAG FALSE)
+set(THREADS_PREFER_PTHREAD_FLAG TRUE)
+
+# Overwrites property for Thread::Threads in find_package(Threads)
+# For CUDA, "-pthread" is replaced with "-Xcompiler -pthread" (CMake's default)
+# For ISPC, "-pthread" is disabled
+macro(open3d_patch_findthreads_module_)
+    if(TARGET Threads::Threads AND THREADS_HAVE_PTHREAD_ARG)
+        set_property(TARGET Threads::Threads
+                     PROPERTY INTERFACE_COMPILE_OPTIONS
+                     "$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:SHELL:-Xcompiler -pthread>"
+                     "$<$<AND:$<NOT:$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>>,$<NOT:$<COMPILE_LANGUAGE:ISPC>>>:-pthread>")
+    endif()
+endmacro()
+cmake_language(EVAL CODE "cmake_language(DEFER CALL open3d_patch_findthreads_module_)")
 
 # Build CUDA module by default if CUDA is available
 if(BUILD_CUDA_MODULE)
@@ -330,6 +342,15 @@ endif ()
 # ISPC language emulation support
 include(Open3DISPC)
 
+if (CMAKE_ISPC_COMPILER_LOADED OR (CMAKE_GENERATOR MATCHES "Make" OR CMAKE_GENERATOR MATCHES "Ninja"))
+    option(ISPC_USE_LEGACY_EMULATION "Use legacy ISPC language emulation over first-class CMake support" OFF)
+else()
+    option(ISPC_USE_LEGACY_EMULATION "Use legacy ISPC language emulation over first-class CMake support" ON)
+endif()
+mark_as_advanced(ISPC_USE_LEGACY_EMULATION)
+option(ISPC_PRINT_LEGACY_COMPILE_COMMANDS "Prints legacy compile commands on CMake configuration time" ON)
+mark_as_advanced(ISPC_PRINT_LEGACY_COMPILE_COMMANDS)
+
 # Build ISPC module by default if ISPC is available
 if (BUILD_ISPC_MODULE)
     include(Open3DFetchISPCCompiler)
@@ -340,11 +361,6 @@ if (BUILD_ISPC_MODULE)
     set(CMAKE_ISPC_INSTRUCTION_SETS ${ISPC_ISAS})
 
     message(STATUS "Using ISPC instruction sets: ${CMAKE_ISPC_INSTRUCTION_SETS}")
-
-    option(ISPC_FORCE_LEGACY "Force legacy ISPC language emulation over first-class CMake support" OFF)
-    mark_as_advanced(ISPC_FORCE_LEGACY)
-    option(ISPC_PRINT_LEGACY_COMPILE_COMMANDS "Prints legacy compile commands on CMake configuration time" ON)
-    mark_as_advanced(ISPC_PRINT_LEGACY_COMPILE_COMMANDS)
 
     open3d_ispc_enable_language(ISPC)
 
