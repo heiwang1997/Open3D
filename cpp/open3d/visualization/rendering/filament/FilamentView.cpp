@@ -345,6 +345,7 @@ Camera* FilamentView::GetCamera() const { return camera_.get(); }
 void FilamentView::CopySettingsFrom(const FilamentView& other) {
     SetMode(other.mode_);
     view_->setRenderTarget(nullptr);
+    view_->setColorGrading(other.color_grading_);
     auto vp = other.view_->getViewport();
     SetViewport(0, 0, vp.width, vp.height);
     camera_->CopyFrom(other.camera_.get());

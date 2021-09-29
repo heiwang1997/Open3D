@@ -36,3 +36,5 @@ make install-pip-package
     - The original scene widget in the visualizer is a SceneWidget, which cannot be converted into python type. So I created a new parameter in the constructor of O3DVisualizer to accept an external widget pointer, which we pass in a PySceneWidget pointer.
     - In order to achieve this, we move PySceneWidget definition from `pybind/visualization/gui/gui.cpp` to `gui.h`, so that it can be referenced in `pybind/visualization/o3dvisualizer.cpp` and create the python compatible constructor.
 4. Add `register_view_refresh_callback` into the legacy `o3d.Visualizer` class, in order to capture camera moving events (to sync views from different windows).
+5. Add `set_shadowing(bool, ShadowType)` binding to `FilamentView` class, so that in python we can change the method to compute shadows.
+6. Fix a bug in `rendering.filament.FilamentView::CopySettingsFrom`, so that color grading can also be copied. Otherwise during rendering to image, the rendered image will not have the same cg as the GUI one.
