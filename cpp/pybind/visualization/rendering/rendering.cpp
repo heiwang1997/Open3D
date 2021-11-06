@@ -516,6 +516,8 @@ void pybind_rendering_classes(py::module &m) {
             .def("set_sun_light", &Scene::SetSunLight,
                  "Sets the parameters of the sun light: direction, "
                  "color, intensity")
+            .def("get_sun_light_direction", &Scene::GetSunLightDirection,
+                 "Get the 3-d vector of the sun direction")
             .def("add_point_light", &Scene::AddPointLight,
                  "Adds a point light to the scene: add_point_light(name, "
                  "color, position, intensity, falloff, cast_shadows)")
