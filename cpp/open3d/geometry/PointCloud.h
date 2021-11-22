@@ -248,6 +248,13 @@ public:
     /// propagation.
     void OrientNormalsConsistentTangentPlane(size_t k);
 
+    /// \brief Function to consistently orient estimated normals based on
+    /// the BFS algorithm used in VCG library and MeshLab.
+    ///
+    /// \param k k nearest neighbour for graph reconstruction.
+    /// \param weight_threshold the minimum alignment for propagation.
+    void OrientNormalsFloodFill(size_t k, double weight_threshold = 0.3);
+
     /// \brief Function to compute the point to point distances between point
     /// clouds.
     ///

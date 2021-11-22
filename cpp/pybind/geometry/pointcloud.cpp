@@ -142,6 +142,10 @@ void pybind_pointcloud(py::module &m) {
                  "Function to orient the normals with respect to consistent "
                  "tangent planes",
                  "k"_a)
+            .def("orient_normals_flood_fill",
+                 &PointCloud::OrientNormalsFloodFill,
+                 "Function to orient the normals using kNN graph with flood fill",
+                 "k"_a, "weight_threshold"_a = 0.3)
             .def("compute_point_cloud_distance",
                  &PointCloud::ComputePointCloudDistance,
                  "For each point in the source point cloud, compute the "

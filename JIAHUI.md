@@ -39,3 +39,4 @@ make install-pip-package
 5. Add `set_shadowing(bool, ShadowType)` binding to `FilamentView` class, so that in python we can change the method to compute shadows.
 6. Fix a bug in `rendering.filament.FilamentView::CopySettingsFrom`, so that color grading can also be copied. Otherwise during rendering to image, the rendered image will not have the same cg as the GUI one.
 7. Add `FilamentScene::GetSunLightDirection` python binding.
+8. Add `PointCloud::OrientNormalsFloodFill` for consistent normal orientation (from MeshLab).

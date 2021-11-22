@@ -278,6 +278,9 @@ struct WeightedEdge {
     size_t v0_;
     size_t v1_;
     double weight_;
+    bool operator< (const WeightedEdge& rv) const {
+        return weight_ < rv.weight_;
+    }
 };
 
 // Minimum Spanning Tree algorithm (Kruskal's algorithm)
@@ -488,6 +491,86 @@ void PointCloud::OrientNormalsConsistentTangentPlane(size_t k) {
             if (!visited[v1]) {
                 traversal_queue.push(v1);
                 TestAndOrientNormal(normals_[v0], normals_[v1]);
+            }
+        }
+    }
+}
+
+void PointCloud::OrientNormalsFloodFill(size_t k, double weight_threshold /* = 0.3 */) {
+    // Reference: https://github.com/cnr-isti-vclab/vcglib/blob/master/vcg/complex/algorithms/pointcloud_normal.h
+
+    if (!HasNormals()) {
+        utility::LogError(
+                "[OrientNormalsFloodFill] No normals in the "
+                "PointCloud. Call EstimateNormals() first.");
+    }
+
+    KDTreeFlann kdtree(*this);
+    std::vector<WeightedEdge> heap;
+    std::vector<bool> visited(points_.size(), false);
+
+    auto AddNeighboursToHeap = [&](size_t v0) {
+        std::vector<int> neighbors;
+        std::vector<double> dists2;
+        kdtree.SearchKNN(points_[v0], int(k), neighbors, dists2);
+        for (size_t vidx1 = 0; vidx1 < neighbors.size(); ++vidx1) {
+            size_t v1 = size_t(neighbors[vidx1]);
+            if (v0 == v1 || visited[v1]) {
+                continue;
+            }
+            double weight = std::abs(normals_[v0].dot(normals_[v1]));
+            if (weight >= weight_threshold) {
+                heap.push_back(WeightedEdge(v0, v1, weight));
+                std::push_heap(heap.begin(), heap.end());
+            }
+        }
+    };
+
+    auto TestAndOrientNormal = [&](const Eigen::Vector3d &n0,
+                                   Eigen::Vector3d &n1) {
+        if (n0.dot(n1) < 0) {
+            n1 *= -1;
+        }
+    };
+
+    // For all disconnected components.
+    for (size_t vc = 0; vc < points_.size(); ++vc) {
+        if (visited[vc]) {
+            continue;
+        }
+
+        // Make permutation-invariant by starting from the unvisited node with max z.
+        double max_z = std::numeric_limits<double>::lowest();
+        size_t v0 = vc;
+        for (size_t vidx = vc; vidx < points_.size(); ++vidx) {
+            if (visited[vidx]) {
+                continue;
+            }
+            const Eigen::Vector3d &v = points_[vidx];
+            if (v(2) > max_z) {
+                max_z = v(2);
+                v0 = vidx;
+            }
+        }
+
+        // Bootstrap (default pointing outward)
+        //  This strategy may work well for convex shapes, for better consistency use the
+        // average normal from remove_hidden_points.
+        visited[v0] = true;
+        TestAndOrientNormal(Eigen::Vector3d(0, 0, 1), normals_[v0]);
+        AddNeighboursToHeap(v0);
+
+        // BFS.
+        while (!heap.empty()) {
+            // Get the best edge to proceed with least weight.
+            std::pop_heap(heap.begin(), heap.end());
+            WeightedEdge a = heap.back();
+            heap.pop_back();
+
+            if (!visited[a.v1_]) {
+                visited[a.v1_] = true;
+                TestAndOrientNormal(normals_[a.v0_], normals_[a.v1_]);
+                AddNeighboursToHeap(a.v1_);
             }
         }
     }
