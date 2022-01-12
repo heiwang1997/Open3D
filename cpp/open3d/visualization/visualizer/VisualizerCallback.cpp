@@ -200,6 +200,7 @@ void Visualizer::KeyPressCallback(
                 utility::LogDebug("[Visualizer] Point size set to {:.2f}.",
                                   render_option_ptr_->point_size_);
             }
+            this->ViewRefreshCallback(window);
             break;
         case GLFW_KEY_MINUS:
             if (mods & GLFW_MOD_SHIFT) {
@@ -214,6 +215,7 @@ void Visualizer::KeyPressCallback(
                 utility::LogDebug("[Visualizer] Point size set to {:.2f}.",
                                   render_option_ptr_->point_size_);
             }
+            this->ViewRefreshCallback(window);
             break;
         case GLFW_KEY_N:
             render_option_ptr_->TogglePointShowNormal();
@@ -223,6 +225,7 @@ void Visualizer::KeyPressCallback(
             utility::LogDebug(
                     "[Visualizer] Point normal rendering {}.",
                     render_option_ptr_->point_show_normal_ ? "ON" : "OFF");
+            this->ViewRefreshCallback(window);
             break;
         case GLFW_KEY_S:
             render_option_ptr_->ToggleShadingOption();
