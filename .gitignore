@@ -111,3 +111,4 @@ docs/getting_started.rst
 3rdparty/libjpeg-turbo/libjpeg-turbo/
 3rdparty/tinygltf/tinygltf/
 3rdparty/tinyobjloader/tinyobjloader/
+docs/tensorboard.md
