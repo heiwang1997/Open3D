@@ -382,7 +382,7 @@ struct O3DVisualizer::Impl {
         ButtonList *actions;
     } settings;
 
-    void Construct(O3DVisualizer *w, gui::SceneWidget *sw) {
+    void Construct(O3DVisualizer *w, const ConstructParams& param) {
         if (window_) {
             return;
         }
@@ -390,6 +390,7 @@ struct O3DVisualizer::Impl {
         window_ = w;
 
         // External widget is managed by GC.
+        SceneWidget* sw = param.scene_widget;
         if (sw) {
             has_external_scene_widget = true;
             scene_ = sw;
@@ -417,6 +418,12 @@ struct O3DVisualizer::Impl {
 
         auto o3dscene = scene_->GetScene();
         o3dscene->SetBackground(ui_state_.bg_color);
+
+        // Add floating widgets to avoid bugs.
+        for (auto wdt : param.other_widgets) {
+            // Don't give ownership.
+            w->AddChild(wdt);
+        }
 
         MakeSettingsUI();
         SetMouseMode(SceneWidget::Controls::ROTATE_CAMERA);
@@ -1882,9 +1889,9 @@ struct O3DVisualizer::Impl {
 };
 
 // ----------------------------------------------------------------------------
-O3DVisualizer::O3DVisualizer(const std::string &title, int width, int height, gui::SceneWidget* scene_widget)
+O3DVisualizer::O3DVisualizer(const std::string &title, int width, int height, ConstructParams param)
     : Window(title, width, height), impl_(new O3DVisualizer::Impl()) {
-    impl_->Construct(this, scene_widget);
+    impl_->Construct(this, param);
 
     // Create a message processor for incoming messages.
     auto on_geometry = [this](std::shared_ptr<geometry::Geometry3D> geom,

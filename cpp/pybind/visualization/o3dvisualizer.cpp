@@ -91,6 +91,15 @@ void pybind_o3dvisualizer(py::module& m) {
             .value("REDRAW", O3DVisualizer::TickResult::REDRAW,
                    "Signals that a redraw is required");
 
+    py::class_<O3DVisualizer::ConstructParams> construct_params(
+         o3dvis, "ConstructParams", "The construction parameter for a o3d-visualizer."
+    );
+    construct_params.def(py::init<>(), "Init")
+                    .def("set_scene_widget", [](O3DVisualizer::ConstructParams &a, gui::PySceneWidget* sw) {
+                         a.scene_widget = sw;
+                    })
+                    .def_readwrite("other_widgets", &O3DVisualizer::ConstructParams::other_widgets);
+
     py::class_<O3DVisualizer::DrawObject> drawobj(
             o3dvis, "DrawObject",
             "Information about an object that is drawn. Do not modify this, it "
@@ -121,8 +130,8 @@ void pybind_o3dvisualizer(py::module& m) {
                           "visiblity may not correspond with this "
                           "value");
 
-    o3dvis.def(py::init<const std::string, int, int, gui::PySceneWidget*>(), "title"_a = "Open3D",
-               "width"_a = 1024, "height"_a = 768, "scene_widget"_a = nullptr,
+    o3dvis.def(py::init<const std::string, int, int, O3DVisualizer::ConstructParams>(), "title"_a = "Open3D",
+               "width"_a = 1024, "height"_a = 768, "param"_a = O3DVisualizer::ConstructParams(),
                "Creates a O3DVisualizer object")
             // selected functions inherited from Window
             .def_property("os_frame", &O3DVisualizer::GetOSFrame,
@@ -357,6 +366,8 @@ void pybind_o3dvisualizer(py::module& m) {
                  "current IBL")
             .def("show_skybox", &O3DVisualizer::ShowSkybox,
                  "Show/Hide the skybox")
+            .def("add_child", &O3DVisualizer::AddChild, 
+                 "Add children (apart from 3D and settings.)")
             .def_property(
                     "show_settings",
                     [](const O3DVisualizer& dv) {

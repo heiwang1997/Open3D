@@ -40,3 +40,6 @@ make install-pip-package
 6. Fix a bug in `rendering.filament.FilamentView::CopySettingsFrom`, so that color grading can also be copied. Otherwise during rendering to image, the rendered image will not have the same cg as the GUI one.
 7. Add `FilamentScene::GetSunLightDirection` python binding.
 8. Add `PointCloud::OrientNormalsFloodFill` for consistent normal orientation (from MeshLab).
+9. Add a `gui.Histogram` widget type to display data histogram of a specific geometry. Open3D implements its own system to control the layouts of imgui components (note IMGUI is not being controlled! It is just instructed to follow the spawn location Open3D assigned), that does not support floating windows. We escape that stupid thing and build our own nice histogram window in `cpp/open3d/visualization/gui/Histogram.cpp`.
+10. Migrate imgui from 1.74 to 1.86 version, add implot dependency to draw histogram.
+11. Due to a bug in implmenetation, we have to add `gui.Histogram` before the settings panel widget! So we change the constructor of `gui.O3DVisualizer` to accomplish that.

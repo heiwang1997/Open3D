@@ -55,6 +55,7 @@
 #include "open3d/visualization/gui/ToggleSwitch.h"
 #include "open3d/visualization/gui/TreeView.h"
 #include "open3d/visualization/gui/VectorEdit.h"
+#include "open3d/visualization/gui/Histogram.h"
 #include "open3d/visualization/gui/Widget.h"
 #include "open3d/visualization/gui/WidgetProxy.h"
 #include "open3d/visualization/gui/Window.h"
@@ -564,6 +565,11 @@ void pybind_gui_classes(py::module &m) {
                  "Sets red, green, blue, and alpha channels, (range: [0.0, "
                  "1.0])",
                  "r"_a, "g"_a, "b"_a, "a"_a = 1.0);
+    py::enum_<Color::Colormap> colormap(color, "Colormap");
+    colormap.value("VIRIDIS", Color::Colormap::VIRIDIS)
+            .value("PLASMA", Color::Colormap::PLASMA)
+            .value("JET", Color::Colormap::JET)
+            .value("SPECTRAL", Color::Colormap::SPECTRAL);
 
     // ---- Theme ----
     // Note: no constructor because themes are created by Open3D
@@ -838,6 +844,18 @@ void pybind_gui_classes(py::module &m) {
                     "Color value (gui.Color)")
             .def("set_on_value_changed", &ColorEdit::SetOnValueChanged,
                  "Calls f(Color) when color changes by user input");
+
+    // ---- Histogram ----
+    py::class_<Histogram, UnownedPointer<Histogram>, Widget> histogram(
+            m, "Histogram", "A floating histogram window for detail displaying");
+    histogram.def(py::init<int, int, int, int, std::string>())
+            .def("__repr__",
+                 [](const Histogram &c) {
+                     std::stringstream s;
+                     s << "Histogram (" << c.GetTitle() << ")";
+                     return s.str();
+                 })
+            .def("set_value", &Histogram::SetValue, "Set the histogram values to be used.");
 
     // ---- Combobox ----
     py::class_<Combobox, UnownedPointer<Combobox>, Widget> combobox(

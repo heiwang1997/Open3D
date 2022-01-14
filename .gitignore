@@ -102,7 +102,6 @@ docs/getting_started.rst
 3rdparty/cutlass/
 3rdparty/fmt/
 3rdparty/googletest/
-3rdparty/imgui/
 3rdparty/nanoflann/
 3rdparty/parallelstl/
 3rdparty/open3d_sphinx_theme/

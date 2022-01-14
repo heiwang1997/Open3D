@@ -461,12 +461,6 @@ void pybind_rendering_classes(py::module &m) {
                     &ColorGradingParams::SetTint,
                     "Tint on the green/magenta axis. Ranges from -1.0 to 1.0.");
 
-    // ---- Shadow Options ----
-    py::enum_<View::ShadowType> shadow_type(
-            m, "ShadowType",
-            "Quality level of color grading operations");
-    shadow_type.value("PCF", View::ShadowType::kPCF).value("VSM", View::ShadowType::kVSM);
-
     // ---- View ----
     py::class_<View, UnownedPointer<View>> view(m, "View",
                                                 "Low-level view class");

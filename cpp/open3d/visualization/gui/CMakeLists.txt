@@ -15,6 +15,7 @@ target_sources(GUI PRIVATE
     Font.cpp
     GLFWWindowSystem.cpp
     Gui.cpp
+    Histogram.cpp
     ImageWidget.cpp
     ImguiFilamentBridge.cpp
     Label.cpp

@@ -26,42 +26,38 @@
 
 #pragma once
 
-#include <Eigen/Geometry>
+#include <functional>
+#include <Eigen/Dense>
+
+#include "open3d/visualization/gui/Widget.h"
+#include "open3d/visualization/gui/Color.h"
 
 namespace open3d {
 namespace visualization {
 namespace gui {
 
-class Color {
+class Histogram : public Widget {
 public:
-    enum class Colormap { VIRIDIS, PLASMA, JET, SPECTRAL };
+    Histogram(int x, int y, int w, int h, const std::string& title);
+    ~Histogram() override;
 
-    Color();
-    Color(float r, float g, float b, float a = 1.0);
-    Color(const Eigen::Vector3f& rgb);  // not explicit: want auto-convert
+    void SetValue(float v_min, float v_max, const Eigen::ArrayXf& value, Color::Colormap colormap);
+    const Eigen::ArrayXf& GetValue() const;
 
-    float GetRed() const;
-    float GetGreen() const;
-    float GetBlue() const;
-    float GetAlpha() const;
+    std::string GetTitle() const;
 
-    void SetColor(float r, float g, float b, float a = 1.0);
+    Size CalcPreferredSize(const LayoutContext& context,
+                           const Constraints& constraints) const override;
 
-    const float* GetPointer() const;
-    float* GetMutablePointer();
+    DrawResult Draw(const DrawContext& context) override;
 
-    /// Returns a lighter color.
-    /// \param amount is between 0 and 1, with 0 being the same color and
-    /// 1 being white.
-    Color Lightened(float amount);
-
-    unsigned int ToABGR32() const;
-
-    bool operator==(const Color& rhs) const;
-    bool operator!=(const Color& rhs) const;
+    /// Specifies a callback function which will be called when the value
+    /// changes as a result of user action.
+    void SetOnValueChanged(std::function<void(const Color&)> on_value_changed);
 
 private:
-    float rgba_[4];
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
 };
 
 }  // namespace gui

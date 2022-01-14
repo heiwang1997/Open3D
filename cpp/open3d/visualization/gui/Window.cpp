@@ -28,6 +28,7 @@
 
 #include <imgui.h>
 #include <imgui_internal.h>  // so we can examine the current context
+#include <implot.h>
 
 #include <algorithm>
 #include <cmath>
@@ -303,6 +304,7 @@ Window::Window(const std::string& title,
 
     auto& theme = impl_->theme_;  // shorter alias
     impl_->imgui_.context = ImGui::CreateContext();
+    ImPlot::CreateContext();
     auto oldContext = MakeDrawContextCurrent();
 
     // ImGUI creates a bitmap atlas from a font, so we need to have the correct
@@ -420,6 +422,7 @@ Window::~Window() {
     impl_->active_dialog_.reset();
     impl_->children_.clear();  // needs to happen before deleting renderer
     ImGui::SetCurrentContext(impl_->imgui_.context);
+    ImPlot::DestroyContext();
     ImGui::DestroyContext();
     delete impl_->renderer_;
     DestroyWindow();

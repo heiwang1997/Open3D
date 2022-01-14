@@ -64,6 +64,14 @@ class O3DVisualizer : public gui::Window {
 public:
     enum class Shader { STANDARD, UNLIT, NORMALS, DEPTH };
 
+    struct ConstructParams {
+        gui::SceneWidget* scene_widget;
+        std::vector<std::shared_ptr<gui::Widget> > other_widgets;
+        ConstructParams() {
+            scene_widget = nullptr;
+        };
+    };
+
     struct DrawObject {
         std::string name;
         std::shared_ptr<geometry::Geometry3D> geometry;
@@ -109,7 +117,7 @@ public:
     };
 
     // Jiahui: This allows pass in a PySceneWidget which we can control from outside.
-    O3DVisualizer(const std::string& title, int width, int height, gui::SceneWidget* scene_widget = nullptr);
+    O3DVisualizer(const std::string& title, int width, int height, ConstructParams param = ConstructParams());
 
     virtual ~O3DVisualizer();
 

@@ -1060,12 +1060,33 @@ if(BUILD_GUI)
                 imgui_demo.cpp
                 imgui_draw.cpp
                 imgui_widgets.cpp
+                imgui_tables.cpp
                 imgui.cpp
             DEPENDS
                 ext_imgui
         )
     endif()
     list(APPEND Open3D_3RDPARTY_PRIVATE_TARGETS Open3D::3rdparty_imgui)
+endif()
+
+# implot (for plotting histogram)
+if(BUILD_GUI)
+    # This downloads the files.
+    #   Because imgui does not have CMakeLists, only the download will be performed
+    include(${Open3D_3RDPARTY_DIR}/implot/implot.cmake)
+    # This makes the downloaded files a usable target for compilation.
+    open3d_build_3rdparty_library(3rdparty_implot DIRECTORY ${IMPLOT_SOURCE_DIR}
+        SOURCES
+            implot_demo.cpp
+            implot_items.cpp
+            implot.cpp
+        DEPENDS
+            ext_implot
+            ext_imgui
+    )
+    # Add internal dependencies...
+    target_include_directories(3rdparty_implot PRIVATE ${IMGUI_SOURCE_DIR})
+    list(APPEND Open3D_3RDPARTY_PRIVATE_TARGETS Open3D::3rdparty_implot)
 endif()
 
 # Filament

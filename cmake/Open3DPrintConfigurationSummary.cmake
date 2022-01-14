@@ -69,6 +69,7 @@ function(open3d_print_configuration_summary)
         GLEW
         GLFW
         imgui
+        implot
         ippicv
         JPEG
         jsoncpp

@@ -425,6 +425,13 @@ class AppWindow:
         # done the window will layout the grandchildren.
         w.set_on_layout(self._on_layout)
         w.add_child(self._scene)
+
+        # Floating histogram must be added before settings panel.
+        my_hist = gui.Histogram(50, 50, 400, 200, "123")
+        import numpy as np
+        my_hist.set_value(0.012, 0.023, np.random.uniform(size=(200,)))
+        w.add_child(my_hist)
+
         w.add_child(self._settings_panel)
 
         # ---- Menu ----
