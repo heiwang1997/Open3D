@@ -62,26 +62,32 @@ function(open3d_print_configuration_summary)
     message(STATUS "================================================================================")
     message(STATUS "Third-Party Dependencies:")
     set(3RDPARTY_DEPENDENCIES
+        Assimp
+        BLAS
         Eigen3
-        faiss
         filament
         fmt
         GLEW
         GLFW
+        googletest
         imgui
         implot
         ippicv
         JPEG
         jsoncpp
         liblzf
+        msgpack
+        nanoflann
         OpenGL
         PNG
         qhullcpp
         librealsense
+        TBB
         tinyfiledialogs
         TinyGLTF
         tinyobjloader
         WebRTC
+        ZeroMQ
     )
     foreach(dep IN LISTS 3RDPARTY_DEPENDENCIES)
         string(TOLOWER "${dep}" dep_lower)

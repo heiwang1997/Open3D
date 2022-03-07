@@ -1158,7 +1158,7 @@ Widget::DrawResult SceneWidget::Draw(const DrawContext& context) {
             ndc.y() *= f.height;
             ImGui::SetWindowFontScale(l->GetTextScale());
             ImGui::SetCursorScreenPos(
-                    ImVec2(ndc.x() - f.x, f.height - ndc.y() - f.y));
+                    ImVec2(ndc.x() + f.x, f.height - ndc.y() - f.y));
             auto color = l->GetTextColor();
             ImGui::TextColored({color.GetRed(), color.GetGreen(),
                                 color.GetBlue(), color.GetAlpha()},
@@ -1174,8 +1174,9 @@ Widget::DrawResult SceneWidget::Draw(const DrawContext& context) {
         for (size_t i = 0; i < impl_->ui_lines_.size() - 1; i += 2) {
             auto& p0 = impl_->ui_lines_[i];
             auto& p1 = impl_->ui_lines_[i + 1];
-            draw_list->AddLine({float(p0.x()), float(p0.y())},
-                               {float(p1.x()), float(p1.y())}, ui_color, 2);
+            draw_list->AddLine({float(p0.x() + f.x), float(p0.y() + f.y)},
+                               {float(p1.x() + f.x), float(p1.y() + f.y)},
+                               ui_color, 2);
         }
     }
 

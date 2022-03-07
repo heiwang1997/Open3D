@@ -24,14 +24,7 @@
 # IN THE SOFTWARE.
 # ----------------------------------------------------------------------------
 
-# examples/python/visualization/load_save_viewpoint.py
-
-import numpy as np
 import open3d as o3d
-import os
-
-pyexample_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-test_data_path = os.path.join(os.path.dirname(pyexample_path), 'test_data')
 
 
 def save_view_point(pcd, filename):
@@ -56,6 +49,7 @@ def load_view_point(pcd, filename):
 
 
 if __name__ == "__main__":
-    pcd = o3d.io.read_point_cloud(os.path.join(test_data_path, "fragment.pcd"))
+    pcd_data = o3d.data.PCDPointCloud()
+    pcd = o3d.io.read_point_cloud(pcd_data.path)
     save_view_point(pcd, "viewpoint.json")
     load_view_point(pcd, "viewpoint.json")

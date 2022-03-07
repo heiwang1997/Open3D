@@ -33,11 +33,11 @@ import sys
 pyexample_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(pyexample_path)
 
-import misc.meshes as meshes
+import open3d_example as o3dex
 
 
 def problem0():
-    mesh = meshes.plane(height=1, width=1)
+    mesh = o3dex.get_plane_mesh(height=1, width=1)
     mesh = mesh.subdivide_midpoint(3)
     vertices = np.asarray(mesh.vertices)
     static_ids = [
@@ -55,7 +55,7 @@ def problem0():
 
 
 def problem1():
-    mesh = meshes.plane(height=1, width=1)
+    mesh = o3dex.get_plane_mesh(height=1, width=1)
     mesh = mesh.subdivide_midpoint(3)
     vertices = np.asarray(mesh.vertices)
     static_ids = [
@@ -71,7 +71,8 @@ def problem1():
 
 
 def problem2():
-    mesh = meshes.armadillo()
+    armadillo_data = o3d.data.ArmadilloMesh()
+    mesh = o3d.io.read_triangle_mesh(armadillo_data.path)
     vertices = np.asarray(mesh.vertices)
     static_ids = [idx for idx in np.where(vertices[:, 1] < -30)[0]]
     static_positions = []
@@ -102,3 +103,5 @@ if __name__ == "__main__":
         handles.points = constraint_pos
         handles.paint_uniform_color((0, 1, 0))
         o3d.visualization.draw_geometries([mesh, mesh_prime, handles])
+
+    o3d.utility.set_verbosity_level(o3d.utility.Info)
