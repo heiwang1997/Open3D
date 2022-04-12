@@ -343,8 +343,7 @@ void PointCloud::OrientNormalsToAlignWithDirection(
         /* = Eigen::Vector3d(0.0, 0.0, 1.0)*/) {
     if (!HasNormals()) {
         utility::LogError(
-                "[OrientNormalsToAlignWithDirection] No normals in the "
-                "PointCloud. Call EstimateNormals() first.");
+                "No normals in the PointCloud. Call EstimateNormals() first.");
     }
 #pragma omp parallel for schedule(static) \
         num_threads(utility::EstimateMaxThreads())
@@ -362,8 +361,7 @@ void PointCloud::OrientNormalsTowardsCameraLocation(
         const Eigen::Vector3d &camera_location /* = Eigen::Vector3d::Zero()*/) {
     if (!HasNormals()) {
         utility::LogError(
-                "[OrientNormalsTowardsCameraLocation] No normals in the "
-                "PointCloud. Call EstimateNormals() first.");
+                "No normals in the PointCloud. Call EstimateNormals() first.");
     }
 #pragma omp parallel for schedule(static) \
         num_threads(utility::EstimateMaxThreads())
@@ -386,8 +384,7 @@ void PointCloud::OrientNormalsTowardsCameraLocation(
 void PointCloud::OrientNormalsConsistentTangentPlane(size_t k) {
     if (!HasNormals()) {
         utility::LogError(
-                "[OrientNormalsConsistentTangentPlane] No normals in the "
-                "PointCloud. Call EstimateNormals() first.");
+                "No normals in the PointCloud. Call EstimateNormals() first.");
     }
 
     // Create Riemannian graph (Euclidian MST + kNN)

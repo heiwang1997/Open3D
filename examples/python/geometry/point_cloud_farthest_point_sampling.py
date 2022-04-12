@@ -24,25 +24,15 @@
 # IN THE SOFTWARE.
 # ----------------------------------------------------------------------------
 
-# Download Open3D test data files. The default download path is
-# Open3D/examples/test_data/open3d_downloads
-#
-# See https://github.com/isl-org/open3d_downloads for details on how to
-# manage the test data files.
-#
-# We have to put the version check here and the rest of the Python 3.6+
-# compatible code in a separate file. Otherwise, Python 2 complains about syntax
-# errors before the version check. In addition, please keep this file simple and
-# Python 2&3 compatible. See https://stackoverflow.com/a/3760194/1255535.
-import sys
-if sys.version_info < (3, 6):
-    raise RuntimeError(
-        "Python version must be >= 3.6, however, Python {}.{} is used.".format(
-            sys.version_info[0], sys.version_info[1]))
-
-import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from download_utils import download_all_files
+import open3d as o3d
 
 if __name__ == "__main__":
-    download_all_files()
+    # Load bunny data.
+    bunny = o3d.data.BunnyMesh()
+    pcd = o3d.io.read_point_cloud(bunny.path)
+    pcd.paint_uniform_color([0.5, 0.5, 0.5])
+
+    # Get 1000 samples from original point cloud and paint to green.
+    pcd_down = pcd.farthest_point_down_sample(1000)
+    pcd_down.paint_uniform_color([0, 1, 0])
+    o3d.visualization.draw_geometries([pcd, pcd_down])
