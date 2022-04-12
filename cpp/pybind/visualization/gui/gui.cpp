@@ -441,7 +441,7 @@ void pybind_gui_classes(py::module &m) {
                     "and device pixels (read-only)")
             .def_property_readonly("is_visible", &PyWindow::IsVisible,
                                    "True if window is visible (read-only)")
-            .def("set_on_key", &PyWindow::SetOnKeyEvent,
+            .def("set_on_key", &PyWindow::SetOnKey,
                  "Sets a callback for key events. This callback is passed "
                  "a KeyEvent object. The callback must return "
                  "True to stop more dispatching or False to dispatch"

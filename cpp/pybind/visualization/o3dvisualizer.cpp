@@ -367,6 +367,9 @@ void pybind_o3dvisualizer(py::module& m) {
             .def("enable_raw_mode", &O3DVisualizer::EnableBasicMode,
                  "enable_raw_mode(enable): Enables/disables raw mode for "
                  "simplified lighting envirnment.")
+            .def("enable_sun_follows_camera", &O3DVisualizer::EnableSunFollowsCamera,
+                 "enable_sun_follows_camera(enable): Enables/disables whether sun "
+                 "should follow the camera direction.")
             .def("show_skybox", &O3DVisualizer::ShowSkybox,
                  "Show/Hide the skybox")
             .def("add_child", &O3DVisualizer::AddChild, 

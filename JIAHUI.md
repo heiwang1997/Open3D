@@ -43,3 +43,5 @@ make install-pip-package
 9. Add a `gui.Histogram` widget type to display data histogram of a specific geometry. Open3D implements its own system to control the layouts of imgui components (note IMGUI is not being controlled! It is just instructed to follow the spawn location Open3D assigned), that does not support floating windows. We escape that stupid thing and build our own nice histogram window in `cpp/open3d/visualization/gui/Histogram.cpp`.
 10. Migrate imgui from 1.74 to 1.86 version, add implot dependency to draw histogram.
 11. Due to a bug in implmenetation, we have to add `gui.Histogram` before the settings panel widget! So we change the constructor of `gui.O3DVisualizer` to accomplish that.
+12. Merged with upstream 0.15. Replace the incoming `window.h`'s setKeyEvent to setKey as originally defined.
+13. Add `o3dvisualizer.enable_sun_follows_camera` binding.
