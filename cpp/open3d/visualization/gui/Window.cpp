@@ -1112,7 +1112,7 @@ void Window::OnMouseEvent(const MouseEvent& e) {
         ImGuiContext* context = ImGui::GetCurrentContext();
         for (auto* w : context->Windows) {
             if (w->Flags & ImGuiWindowFlags_Popup &&
-                ImGui::IsPopupOpen(w->PopupId)) {
+                ImGui::IsPopupOpen(w->PopupId, 0)) {
                 Rect r(int(w->Pos.x), int(w->Pos.y), int(w->Size.x),
                        int(w->Size.y));
                 if (r.Contains(e.x, e.y)) {

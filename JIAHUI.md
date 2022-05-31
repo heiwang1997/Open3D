@@ -45,3 +45,4 @@ make install-pip-package
 11. Due to a bug in implmenetation, we have to add `gui.Histogram` before the settings panel widget! So we change the constructor of `gui.O3DVisualizer` to accomplish that.
 12. Merged with upstream 0.15. Replace the incoming `window.h`'s setKeyEvent to setKey as originally defined.
 13. Add `o3dvisualizer.enable_sun_follows_camera` binding.
+14. Merged with upstream 0.15.2.

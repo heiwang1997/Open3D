@@ -2320,6 +2320,10 @@ void O3DVisualizer::SetGroundPlane(rendering::Scene::GroundPlane plane) {
     impl_->SetGroundPlane(plane);
 }
 
+void O3DVisualizer::EnableSunFollowsCamera(bool enable) {
+    impl_->EnableSunFollowsCamera(enable);
+}
+
 void O3DVisualizer::EnableBasicMode(bool enable) {
     impl_->EnableBasicMode(enable);
 }
