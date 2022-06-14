@@ -369,6 +369,19 @@ Eigen::Matrix4d Open3DScene::GetGeometryTransform(const std::string& name) {
     return scene->GetGeometryTransform(name).matrix().cast<double>();
 }
 
+void Open3DScene::SetGeometryDoubleSided(const std::string& name,
+                                         bool double_sided) {
+    auto scene = renderer_.GetScene(scene_);
+    auto g = geometries_.find(name);
+    if (g != geometries_.end()) {
+        scene->SetGeometryDoubleSided(name, double_sided);
+        if (!g->second.fast_name.empty()) {
+            scene->SetGeometryDoubleSided(g->second.fast_name, double_sided);
+        }
+        // Don't want to override low_name, as that is a bounding box.
+    }
+}
+
 void Open3DScene::ModifyGeometryMaterial(const std::string& name,
                                          const MaterialRecord& mat) {
     auto scene = renderer_.GetScene(scene_);
@@ -451,6 +464,10 @@ void Open3DScene::SetLOD(LOD lod) {
             SetGeometryToLOD(g.second, lod);
         }
     }
+}
+
+void Open3DScene::SetModelGeometryNames(const std::vector<std::string>& names) {
+    model_geometry_names_ = names;
 }
 
 void Open3DScene::SetGeometryToLOD(const GeometryData& data, LOD lod) {

@@ -46,3 +46,5 @@ make install-pip-package
 12. Merged with upstream 0.15. Replace the incoming `window.h`'s setKeyEvent to setKey as originally defined.
 13. Add `o3dvisualizer.enable_sun_follows_camera` binding.
 14. Merged with upstream 0.15.2.
+15. Add `gui.Keyframer` to support animation editing.
+16. Enable backface culling binding (double-sided) in filament.

@@ -668,6 +668,8 @@ void pybind_rendering_classes(py::module &m) {
             .def("get_geometry_transform", &Open3DScene::GetGeometryTransform,
                  "get_geometry_transform(name): returns the pose of the "
                  "geometry name in the scene")
+            .def("set_geometry_double_sided", &Open3DScene::SetGeometryDoubleSided,
+                 "get_geometry_double_sided(name, bool): set whether show double-sided.")
             .def("modify_geometry_material",
                  &Open3DScene::ModifyGeometryMaterial,
                  "modify_geometry_material(name, material). Modifies the "

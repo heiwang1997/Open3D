@@ -57,6 +57,7 @@
 #include "open3d/visualization/gui/TreeView.h"
 #include "open3d/visualization/gui/VectorEdit.h"
 #include "open3d/visualization/gui/Histogram.h"
+#include "open3d/visualization/gui/Keyframer.h"
 #include "open3d/visualization/gui/Widget.h"
 #include "open3d/visualization/gui/WidgetProxy.h"
 #include "open3d/visualization/gui/WidgetStack.h"
@@ -895,6 +896,26 @@ void pybind_gui_classes(py::module &m) {
                  })
             .def("set_value", &Histogram::SetValue, "Set the histogram values to be used.");
 
+    // ---- Keyframer ---
+    py::class_<Keyframer, UnownedPointer<Keyframer>, Widget> keyframer(
+            m, "Keyframer", "A window for specifying animation keyframes");
+    keyframer.def(py::init<int, int, int, int, std::string>())
+             .def("__repr__",
+                  [](const Keyframer &c) {
+                      std::stringstream s;
+                      s << "Keyframer (" << c.GetTitle() << ")";
+                      return s.str();
+                  })
+              .def("set_available_targets", &Keyframer::SetAvailableTargets, "Set the target animator.")
+              .def("set_keyframes", &Keyframer::SetKeyframes, "Set all the keyframes.")
+              .def("set_current_frame", &Keyframer::SetCurrentFrame, "Set the current frame.")
+              .def("set_on_frame_changed", &Keyframer::SetOnFrameChanged, "Callback when frame is changed.")
+              .def("set_on_target_changed", &Keyframer::SetOnTargetChanged, "Callback when target is changed.")
+              .def("set_on_play_status_changed", &Keyframer::SetOnPlayStatusChanged, "Callback when play button status changed.")
+              .def("set_on_keyframe_added", &Keyframer::SetOnKeyframeAdded, "Callback when keyframe is added.")
+              .def("set_on_keyframe_removed", &Keyframer::SetOnKeyframeRemoved, "Callback when keyframe is removed.")
+              .def("set_on_keyframe_moved", &Keyframer::SetOnKeyframeMoved, "Callback when keyframe is moved.");
+
     // ---- Combobox ----
     py::class_<Combobox, UnownedPointer<Combobox>, Widget> combobox(
             m, "Combobox", "Exclusive selection from a pull-down menu");
@@ -1269,6 +1290,7 @@ void pybind_gui_classes(py::module &m) {
             .value("ROTATE_IBL", SceneWidget::Controls::ROTATE_IBL)
             .value("ROTATE_MODEL", SceneWidget::Controls::ROTATE_MODEL)
             .value("PICK_POINTS", SceneWidget::Controls::PICK_POINTS)
+            .value("PICK_GEOMETRY", SceneWidget::Controls::PICK_GEOMETRY)
             .export_values();
 
     scene.def(py::init<>(),

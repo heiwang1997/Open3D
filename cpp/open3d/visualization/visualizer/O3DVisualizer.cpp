@@ -418,6 +418,41 @@ struct O3DVisualizer::Impl {
                     }
                     polygon_selection_unselects_ = false;
                 });
+        scene_->SetOnGeometryPicked(
+                [this](const std::vector<std::string>& names) {
+                    // Update the selection set list.
+                    auto scene = scene_->GetScene();
+                    scene->SetModelGeometryNames(names);
+
+                    // Display a bounding box of the geometry.
+                    for (auto &o : objects_) {
+                        std::string name = std::string("__selbbox_") + o.name;
+                        bool is_selected = false;
+                        for (auto &n : names) {
+                            if (n == o.name) {
+                                is_selected = true;
+                                break;
+                            }
+                        }
+                        if (is_selected) {
+                            if (!scene->HasGeometry(name)) {
+                                auto bbox = o.geometry->GetAxisAlignedBoundingBox();
+                                auto lst = geometry::LineSet::CreateFromAxisAlignedBoundingBox(bbox);
+                                rendering::MaterialRecord m;
+                                m.shader = "unlitLine";
+                                m.base_color = {0.0f, 1.0f, 0.0f, 1.0f};
+                                scene->AddGeometry(name, lst.get(), m);
+                                scene->GetScene()->GeometryShadows(name, false, false);
+                                scene->GetScene()->SetGeometryTransform(name, scene->GetScene()->GetGeometryTransform(o.name));
+                            }
+                        } else {
+                            if (scene->HasGeometry(name)) {
+                                scene->RemoveGeometry(name);
+                            }
+                        }
+
+                    }
+                });
         w->AddChild(GiveOwnership(scene_));
 
         auto o3dscene = scene_->GetScene();
@@ -524,7 +559,7 @@ struct O3DVisualizer::Impl {
                 "Cmd-click to select a point\nCmd-ctrl-click to polygon select";
 #else
         const char *selection_help =
-                "Ctrl-click to select a point\nCmd-alt-click to polygon select";
+                "Ctrl-click to select a point\nCtrl-alt-click to polygon select";
 #endif  // __APPLE__
         h = new Horiz();
         h->AddStretch();
@@ -1605,6 +1640,23 @@ struct O3DVisualizer::Impl {
         }
 
         scene_->SetViewControls(mode);
+        if (mode == SceneWidget::Controls::PICK_GEOMETRY) {
+            // Always update because object pose may change.
+            UpdateSelectableGeometry();
+        }
+        
+        // Keep the bboxes when rotating the models.
+        if (mode != SceneWidget::Controls::PICK_GEOMETRY && 
+            mode != SceneWidget::Controls::ROTATE_MODEL) {
+            for (auto &o : objects_) {
+                std::string name = std::string("__selbbox_") + o.name;
+                auto scene = scene_->GetScene();
+                if (scene->HasGeometry(name)) {
+                    scene->RemoveGeometry(name);
+                }
+            }
+        }
+
         ui_state_.mouse_mode = mode;
         settings.view_mouse_mode = mode;
         for (const auto &t_b : settings.mouse_buttons) {
@@ -1963,6 +2015,7 @@ struct O3DVisualizer::Impl {
                 continue;
             }
             pickable.emplace_back(o.name, o.geometry.get(), o.tgeometry.get());
+            pickable.back().transform = scene_->GetScene()->GetGeometryTransform(o.name);
         }
         selections_->SetSelectableGeometry(pickable);
     }

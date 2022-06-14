@@ -758,6 +758,16 @@ void FilamentScene::SetGeometryTransform(const std::string& object_name,
     }
 }
 
+void FilamentScene::SetGeometryDoubleSided(const std::string& object_name,
+                                           bool double_sided) {
+    auto geoms = GetGeometry(object_name);
+    for (auto* g : geoms) {
+        renderer_.ModifyMaterial(g->mat.mat_instance)
+            .SetDoubleSided(double_sided)
+            .Finish();
+    }
+}
+
 FilamentScene::Transform FilamentScene::GetGeometryTransform(
         const std::string& object_name) {
     Transform etransform;

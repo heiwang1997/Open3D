@@ -143,6 +143,12 @@ void ModelInteractorLogic::UpdateBoundingBox(const Camera::Transform& t) {
     // center of rotation, because normally this call is not done during
     // mouse movement, but rather, once to initalize the interactor.
     Super::SetBoundingBox(geometry::AxisAlignedBoundingBox(new_min, new_max));
+
+    // Make the bounding box keep track of the transform:
+    auto* scene = scene_->GetScene();
+    for (const auto& m : transforms_at_mouse_down_) {
+        scene->SetGeometryTransform(std::string("__selbbox_") + m.first, scene->GetGeometryTransform(m.first));
+    }
 }
 
 const std::string kAxisObjectName("__axis__");
@@ -151,8 +157,9 @@ void ModelInteractorLogic::StartMouseDrag() {
     SetMouseDownInfo(Camera::Transform::Identity(), center_of_rotation_);
 
     transforms_at_mouse_down_.clear();
-    auto models = scene_->GetGeometries();
+    // auto models = scene_->GetGeometries();
     auto* scene = scene_->GetScene();
+    auto models = scene_->GetModelGeometryNames();
 
     for (const auto& m : models) {
         transforms_at_mouse_down_[m] = scene->GetGeometryTransform(m);

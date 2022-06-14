@@ -41,6 +41,7 @@
 #include "open3d/visualization/gui/Label.h"
 #include "open3d/visualization/gui/Label3D.h"
 #include "open3d/visualization/gui/PickPointsInteractor.h"
+#include "open3d/visualization/gui/PickGeometryInteractor.h"
 #include "open3d/visualization/gui/Util.h"
 #include "open3d/visualization/rendering/Camera.h"
 #include "open3d/visualization/rendering/CameraInteractorLogic.h"
@@ -571,6 +572,45 @@ private:
     std::unique_ptr<PickPointsInteractor> pick_;
 };
 
+class PickGeometryMetaInteractor : public RotateCameraInteractor {
+    using Super = RotateCameraInteractor;
+
+public:
+    PickGeometryMetaInteractor(rendering::Open3DScene* scene, rendering::Camera* camera)
+        : Super(scene, camera),
+          pick_(new PickGeometryInteractor(scene, camera)) {}
+
+    void SetViewSize(const Size& size) {
+        GetMatrixInteractor().SetViewSize(size.width, size.height);
+        pick_->GetMatrixInteractor().SetViewSize(size.width, size.height);
+    }
+
+    void SetPickableGeometry(
+            const std::vector<SceneWidget::PickableGeometry>& geometry) {
+        pick_->SetPickableGeometry(geometry);
+    }
+
+    void SetOnGeometryPicked(std::function<void(const std::vector<std::string>&)> on_picked) {
+        pick_->SetOnGeometryPicked(on_picked);
+    }
+
+    void SetNeedsRedraw() { pick_->SetNeedsRedraw(); }
+
+    void Mouse(const MouseEvent& e) override {
+        if (e.modifiers & int(KeyModifier::CTRL)) {
+            pick_->Mouse(e);
+        } else {
+            Super::Mouse(e);
+            pick_->SetNeedsRedraw();
+        }
+    }
+
+    void Key(const KeyEvent& e) override { pick_->Key(e); }
+
+private:
+    std::unique_ptr<PickGeometryInteractor> pick_;
+};
+
 // ----------------------------------------------------------------------------
 class Interactors {
 public:
@@ -583,7 +623,8 @@ public:
           ibl_(std::make_unique<RotateIBLInteractor>(scene->GetScene(),
                                                      camera)),
           model_(std::make_unique<RotateModelInteractor>(scene, camera)),
-          pick_(std::make_unique<PickInteractor>(scene, camera)) {
+          pick_(std::make_unique<PickInteractor>(scene, camera)),
+          pick_geometry_(std::make_unique<PickGeometryMetaInteractor>(scene, camera)) {
         current_ = rotate_.get();
     }
 
@@ -596,6 +637,7 @@ public:
         ibl_->GetMatrixInteractor().SetViewSize(size.width, size.height);
         model_->GetMatrixInteractor().SetViewSize(size.width, size.height);
         pick_->SetViewSize(size);
+        pick_geometry_->SetViewSize(size);
     }
 
     void SetBoundingBox(const geometry::AxisAlignedBoundingBox& bounds) {
@@ -606,6 +648,7 @@ public:
         ibl_->GetMatrixInteractor().SetBoundingBox(bounds);
         model_->GetMatrixInteractor().SetBoundingBox(bounds);
         pick_->GetMatrixInteractor().SetBoundingBox(bounds);
+        pick_geometry_->GetMatrixInteractor().SetBoundingBox(bounds);
     }
 
     Eigen::Vector3f GetCenterOfRotation() const {
@@ -633,6 +676,7 @@ public:
     void SetPickableGeometry(
             const std::vector<SceneWidget::PickableGeometry>& geometry) {
         pick_->SetPickableGeometry(geometry);
+        pick_geometry_->SetPickableGeometry(geometry);
     }
 
     void SetPickablePointSize(int px) { pick_->SetPickablePointSize(px); }
@@ -646,6 +690,11 @@ public:
         pick_->SetOnPointsPicked(on_picked);
     }
 
+    void SetOnGeometryPicked(
+        std::function<void(const std::vector<std::string>&)> on_picked) {
+        pick_geometry_->SetOnGeometryPicked(on_picked);
+    }
+
     void SetOnStartedPolygonPicking(std::function<void()> on_poly_pick) {
         pick_->SetOnStartedPolygonPicking(on_poly_pick);
     }
@@ -654,7 +703,10 @@ public:
 
     void ClearPolygonPick() { pick_->ClearPolygonPick(); }
 
-    void SetPickNeedsRedraw() { pick_->SetNeedsRedraw(); }
+    void SetPickNeedsRedraw() { 
+        pick_->SetNeedsRedraw(); 
+        pick_geometry_->SetNeedsRedraw();
+    }
 
     void SetOnInteractorUIUpdated(
             std::function<void(const std::vector<Eigen::Vector2i>&)> on_ui) {
@@ -674,6 +726,8 @@ public:
             return SceneWidget::Controls::ROTATE_MODEL;
         } else if (current_ == pick_.get()) {
             return SceneWidget::Controls::PICK_POINTS;
+        } else if (current_ == pick_geometry_.get()) {
+            return SceneWidget::Controls::PICK_GEOMETRY;
         } else {
             return SceneWidget::Controls::ROTATE_CAMERA;
         }
@@ -701,6 +755,9 @@ public:
                 break;
             case SceneWidget::Controls::PICK_POINTS:
                 current_ = pick_.get();
+                break;
+            case SceneWidget::Controls::PICK_GEOMETRY:
+                current_ = pick_geometry_.get();
                 break;
         }
     }
@@ -750,6 +807,7 @@ private:
     std::unique_ptr<RotateIBLInteractor> ibl_;
     std::unique_ptr<RotateModelInteractor> model_;
     std::unique_ptr<PickInteractor> pick_;
+    std::unique_ptr<PickGeometryMetaInteractor> pick_geometry_;
 
     SceneWidget::MouseInteractor* current_ = nullptr;
     SceneWidget::MouseInteractor* override_ = nullptr;
@@ -774,6 +832,7 @@ struct SceneWidget::Impl {
     bool scene_caching_enabled_ = false;
     std::vector<Eigen::Vector2i> ui_lines_;
     std::unordered_set<std::shared_ptr<Label3D>> labels_3d_;
+
     struct {
         Eigen::Matrix3d matrix;
         float width = 1.0f;
@@ -940,6 +999,11 @@ void SceneWidget::SetOnPointsPicked(
                              std::vector<std::pair<size_t, Eigen::Vector3d>>>&,
                      int)> on_picked) {
     impl_->controls_->SetOnPointsPicked(on_picked);
+}
+
+void SceneWidget::SetOnGeometryPicked(
+        std::function<void(const std::vector<std::string>&)> on_picked) {
+    impl_->controls_->SetOnGeometryPicked(on_picked);
 }
 
 void SceneWidget::SetScene(std::shared_ptr<rendering::Open3DScene> scene) {

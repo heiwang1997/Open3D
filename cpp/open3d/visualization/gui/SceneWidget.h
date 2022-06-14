@@ -92,7 +92,8 @@ public:
         ROTATE_SUN,
         ROTATE_IBL,
         ROTATE_MODEL,
-        PICK_POINTS
+        PICK_POINTS,
+        PICK_GEOMETRY
     };
     void SetViewControls(Controls mode);
 
@@ -151,6 +152,7 @@ public:
         std::string name;
         const geometry::Geometry3D* geometry = nullptr;
         const t::geometry::Geometry* tgeometry = nullptr;
+        Eigen::Matrix4d transform;
 
         PickableGeometry(const std::string& n, const geometry::Geometry3D* g)
             : name(n), geometry(g) {}
@@ -177,6 +179,8 @@ public:
                             std::string,
                             std::vector<std::pair<size_t, Eigen::Vector3d>>>&,
                     int)> on_picked);
+    void SetOnGeometryPicked(
+        std::function<void(const std::vector<std::string>&)> on_picked);
     void SetOnStartedPolygonPicking(std::function<void()> on_poly_pick);
     enum class PolygonPickAction { CANCEL = 0, SELECT };
     void DoPolygonPick(PolygonPickAction action);

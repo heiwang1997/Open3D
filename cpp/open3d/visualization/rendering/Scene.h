@@ -121,6 +121,8 @@ public:
     virtual void QueryGeometry(std::vector<std::string>& geometry) = 0;
     virtual void SetGeometryTransform(const std::string& object_name,
                                       const Transform& transform) = 0;
+    virtual void SetGeometryDoubleSided(const std::string& object_name,
+                                        bool double_sided) = 0;
     virtual Transform GetGeometryTransform(const std::string& object_name) = 0;
     virtual geometry::AxisAlignedBoundingBox GetGeometryBoundingBox(
             const std::string& object_name) = 0;

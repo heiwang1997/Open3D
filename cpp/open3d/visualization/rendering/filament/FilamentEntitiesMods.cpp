@@ -222,6 +222,9 @@ MaterialModifier& FilamentMaterialModifier::SetTexture(
 MaterialModifier& FilamentMaterialModifier::SetDoubleSided(bool double_sided) {
     if (material_instance_) {
         material_instance_->setDoubleSided(double_sided);
+        material_instance_->setCullingMode(
+                double_sided ? filament::MaterialInstance::CullingMode::NONE
+                             : filament::MaterialInstance::CullingMode::BACK);
     }
     return *this;
 }

@@ -112,6 +112,8 @@ public:
     void SetGeometryTransform(const std::string& name,
                               const Eigen::Matrix4d& transform);
     Eigen::Matrix4d GetGeometryTransform(const std::string& name);
+    void SetGeometryDoubleSided(const std::string& object_name,
+                                bool double_sided);
 
     void ModifyGeometryMaterial(const std::string& name,
                                 const MaterialRecord& mat);
@@ -136,6 +138,12 @@ public:
     Scene* GetScene() const;
     Camera* GetCamera() const;
     Renderer& GetRenderer() const;
+
+    // models to be controlled by the model interactor.
+    void SetModelGeometryNames(const std::vector<std::string>& names);
+    const std::vector<std::string>& GetModelGeometryNames() const {
+        return model_geometry_names_;
+    }
 
 private:
     struct GeometryData {
@@ -163,6 +171,10 @@ private:
     std::map<std::string, GeometryData> geometries_;  // name -> data
     geometry::AxisAlignedBoundingBox bounds_;
     size_t downsample_threshold_ = 6000000;
+
+    // name of the geometries to be controlled by the model interactor.
+    //  If empty, then everything is controlled.
+    std::vector<std::string> model_geometry_names_;
 };
 
 }  // namespace rendering

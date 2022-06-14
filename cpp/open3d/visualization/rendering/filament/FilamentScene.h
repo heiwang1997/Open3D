@@ -132,6 +132,8 @@ public:
     bool GeometryIsVisible(const std::string& object_name) override;
     void SetGeometryTransform(const std::string& object_name,
                               const Transform& transform) override;
+    void SetGeometryDoubleSided(const std::string& object_name,
+                                bool double_sided) override;
     Transform GetGeometryTransform(const std::string& object_name) override;
     geometry::AxisAlignedBoundingBox GetGeometryBoundingBox(
             const std::string& object_name) override;

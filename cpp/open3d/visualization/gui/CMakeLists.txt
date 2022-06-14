@@ -16,6 +16,7 @@ target_sources(GUI PRIVATE
     GLFWWindowSystem.cpp
     Gui.cpp
     Histogram.cpp
+    Keyframer.cpp
     ImageWidget.cpp
     ImguiFilamentBridge.cpp
     Label.cpp
@@ -27,6 +28,7 @@ target_sources(GUI PRIVATE
     NumberEdit.cpp
     RadioButton.cpp
     PickPointsInteractor.cpp
+    PickGeometryInteractor.cpp
     ProgressBar.cpp
     SceneWidget.cpp
     Slider.cpp
