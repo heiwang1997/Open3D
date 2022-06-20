@@ -674,6 +674,9 @@ void pybind_rendering_classes(py::module &m) {
                  &Open3DScene::ModifyGeometryMaterial,
                  "modify_geometry_material(name, material). Modifies the "
                  "material of the specified geometry")
+            .def("get_model_geometry_names", &Open3DScene::GetModelGeometryNames,
+                 "get_model_geometry_names(): returns a list of "
+                 "selected geometry names")
             .def("show_geometry", &Open3DScene::ShowGeometry,
                  "Shows or hides the geometry with the given name")
             .def("update_material", &Open3DScene::UpdateMaterial,

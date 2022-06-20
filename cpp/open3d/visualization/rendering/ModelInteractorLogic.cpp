@@ -154,8 +154,6 @@ void ModelInteractorLogic::UpdateBoundingBox(const Camera::Transform& t) {
 const std::string kAxisObjectName("__axis__");
 
 void ModelInteractorLogic::StartMouseDrag() {
-    SetMouseDownInfo(Camera::Transform::Identity(), center_of_rotation_);
-
     transforms_at_mouse_down_.clear();
     // auto models = scene_->GetGeometries();
     auto* scene = scene_->GetScene();
@@ -163,6 +161,7 @@ void ModelInteractorLogic::StartMouseDrag() {
 
     for (const auto& m : models) {
         transforms_at_mouse_down_[m] = scene->GetGeometryTransform(m);
+        SetMouseDownInfo(transforms_at_mouse_down_[m], transforms_at_mouse_down_[m].translation());
     }
 
     // Show axes while user is dragging
