@@ -185,6 +185,8 @@ void pybind_o3dvisualizer(py::module& m) {
                  "close")
             .def("set_on_key", &O3DVisualizer::SetOnKey,
                  "Set a key callback. Please see Jiahui's note.")
+            .def("get_mouse_mods", &O3DVisualizer::GetMouseMods,
+                 "Get current key modifiers.")
             .def("show_menu", &O3DVisualizer::ShowMenu,
                  "show_menu(show): shows or hides the menu in the window, "
                  "except on macOS since the menubar is not in the window "
