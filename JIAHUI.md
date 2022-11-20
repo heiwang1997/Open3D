@@ -49,3 +49,4 @@ make install-pip-package
 15. Add `gui.Keyframer` to support animation editing.
 16. Enable backface culling binding (double-sided) in filament.
 17. Enable selecting model and edit its pose in the new viewer.
+18. Add `set_indirect_light_rotation` binding.

@@ -549,6 +549,12 @@ void pybind_rendering_classes(py::module &m) {
             .def("set_indirect_light_intensity",
                  &Scene::SetIndirectLightIntensity,
                  "Sets the brightness of the indirect light")
+            .def("set_indirect_light_rotation",
+               [](Scene &scene, const Eigen::Matrix4d& transform) {
+                    const Eigen::Transform<float, 3, Eigen::Affine> t(transform.cast<float>());
+                    scene.SetIndirectLightRotation(t);
+               },
+               "Sets the rotation of the indirect light")
             .def("enable_sun_light", &Scene::EnableSunLight)
             .def("set_sun_light", &Scene::SetSunLight,
                  "Sets the parameters of the sun light: direction, "
