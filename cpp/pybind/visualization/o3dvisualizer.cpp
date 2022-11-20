@@ -127,7 +127,7 @@ void pybind_o3dvisualizer(py::module& m) {
                           "True if the object is checked in the list. "
                           "If the object's group is unchecked or an "
                           "animation is playing, the object's "
-                          "visiblity may not correspond with this "
+                          "visibility may not correspond with this "
                           "value");
 
     o3dvis.def(py::init<const std::string, int, int, O3DVisualizer::ConstructParams>(), "title"_a = "Open3D",
@@ -368,7 +368,7 @@ void pybind_o3dvisualizer(py::module& m) {
                  "current IBL")
             .def("enable_raw_mode", &O3DVisualizer::EnableBasicMode,
                  "enable_raw_mode(enable): Enables/disables raw mode for "
-                 "simplified lighting envirnment.")
+                 "simplified lighting environment.")
             .def("enable_sun_follows_camera", &O3DVisualizer::EnableSunFollowsCamera,
                  "enable_sun_follows_camera(enable): Enables/disables whether sun "
                  "should follow the camera direction.")

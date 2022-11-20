@@ -101,7 +101,7 @@ enum class EventCallbackResult { IGNORED = 0, HANDLED, CONSUMED };
         std::function<int(const KeyEvent &)> on_key_;
     };
 
-void InitializeForPython(std::string resource_path = "");
+void InitializeForPython(std::string resource_path = "", bool headless = false);
 std::shared_ptr<geometry::Image> RenderToImageWithoutWindow(
         rendering::Open3DScene *scene, int width, int height);
 std::shared_ptr<geometry::Image> RenderToDepthImageWithoutWindow(

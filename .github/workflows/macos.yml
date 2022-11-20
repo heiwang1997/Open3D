@@ -20,18 +20,18 @@ concurrency:
 
 env:
   # https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
-  NPROC: 3
+  NPROC: 4
   DEVELOPER_BUILD: ${{ github.event.inputs.developer_build || 'ON' }}
 
 jobs:
   MacOS:
-    runs-on: macos-10.15
+    runs-on: macos-12
     strategy:
       fail-fast: false
       matrix:
         CONFIG: [ON, OFF]
     env:
-      SHARED: ${{ matrix.CONFIG }}
+      BUILD_SHARED_LIBS: ${{ matrix.CONFIG }}
       BUILD_CUDA_MODULE: OFF
       BUILD_TENSORFLOW_OPS: ${{ matrix.CONFIG }}
       BUILD_PYTORCH_OPS: ${{ matrix.CONFIG }}
@@ -55,10 +55,17 @@ jobs:
       - name: Set up Python version
         uses: actions/setup-python@v2
         with:
-          python-version: 3.6
+          python-version: 3.7
       - name: Install dependencies
         run: |
-          brew install ccache
+          brew install ccache pkg-config
+          # Install libomp 11.1.0 from old brew bottle for catalina (10.15).
+          # Directly installing the Ruby formula will install for the current OS
+          # https://github.com/microsoft/LightGBM/issues/4229
+          brew unlink libomp
+          curl -L -H "Authorization: Bearer QQ==" -o libomp-11.1.0.catalina.bottle.tar.gz \
+          https://ghcr.io/v2/homebrew/core/libomp/blobs/sha256:45a5aa653bd45bd5ff5858580b1a4670c4b5a51ea29d68d45a53f72f56010e05
+          brew install -f libomp-11.1.0.catalina.bottle.tar.gz
           ccache -M 2G  # See .github/workflows/readme.md for ccache strategy.
       - name: Config and build
         run: |
@@ -68,7 +75,7 @@ jobs:
           DEVEL_PKG_NAME="$(basename package/open3d-devel-*.tar.xz)"
           echo "DEVEL_PKG_NAME=$DEVEL_PKG_NAME" >> $GITHUB_ENV
       - name: Build Open3D viewer app
-        if: ${{ env.SHARED == 'OFF' }}
+        if: ${{ env.BUILD_SHARED_LIBS == 'OFF' }}
         run: |
           PATH=/usr/local/var/homebrew/linked/ccache/libexec:$PATH
           pushd build
@@ -78,7 +85,7 @@ jobs:
           ccache -s
 
       - name: Upload package
-        if: ${{ env.SHARED == 'ON' }}
+        if: ${{ env.BUILD_SHARED_LIBS == 'ON' }}
         uses: actions/upload-artifact@v2
         with:
           name: open3d-devel-macosx
@@ -86,7 +93,7 @@ jobs:
           if-no-files-found: error
 
       - name: GCloud CLI setup
-        if: ${{ github.ref == 'refs/heads/master' && env.SHARED == 'ON' }}
+        if: ${{ github.ref == 'refs/heads/master' && env.BUILD_SHARED_LIBS == 'ON' }}
         # https://github.com/GoogleCloudPlatform/github-actions/issues/100#issuecomment-650798308
         uses: google-github-actions/setup-gcloud@v0.2.1
         with:
@@ -96,14 +103,14 @@ jobs:
           export_default_credentials: true
 
       - name: Upload package to GCS bucket
-        if: ${{ github.ref == 'refs/heads/master' && env.SHARED == 'ON' }}
+        if: ${{ github.ref == 'refs/heads/master' && env.BUILD_SHARED_LIBS == 'ON' }}
         run: |
           gsutil cp build/package/${{ env.DEVEL_PKG_NAME }} gs://open3d-releases-master/devel/
           echo "Download devel package at: https://storage.googleapis.com/open3d-releases-master/devel/${{ env.DEVEL_PKG_NAME }}"
 
       - name: Upload Open3D viewer app
         uses: actions/upload-artifact@v2
-        if: ${{ env.SHARED == 'OFF' }}
+        if: ${{ env.BUILD_SHARED_LIBS == 'OFF' }}
         with:
           name: open3d-app-macosx-10_15
           path: build/bin/open3d-app-macosx-10_15.zip
@@ -111,21 +118,21 @@ jobs:
 
   build-wheel:
     name: Build wheel
-    runs-on: macos-10.15
+    runs-on: macos-12
     strategy:
       fail-fast: false
       # https://github.community/t/how-to-conditionally-include-exclude-items-in-matrix-eg-based-on-branch/16853/6
       matrix:
-        python_version: [3.6, 3.7, 3.8, 3.9]
+        python_version: ['3.7', '3.8', '3.9', '3.10']
         is_master:
           - ${{ github.ref == 'refs/heads/master' }}
         exclude:
           - is_master: false
-            python_version: 3.7
+            python_version: '3.7'
           - is_master: false
-            python_version: 3.8
+            python_version: '3.8'
           - is_master: false
-            python_version: 3.9
+            python_version: '3.9'
 
     env:
       BUILD_CUDA_MODULE: OFF
@@ -169,7 +176,12 @@ jobs:
           cmake --version
           source util/ci_utils.sh
           install_python_dependencies
+          # Install libomp 11.1.0. See comment above.
           brew install ccache
+          brew unlink libomp
+          curl -L -H "Authorization: Bearer QQ==" -o libomp-11.1.0.catalina.bottle.tar.gz \
+          https://ghcr.io/v2/homebrew/core/libomp/blobs/sha256:45a5aa653bd45bd5ff5858580b1a4670c4b5a51ea29d68d45a53f72f56010e05
+          brew install -f libomp-11.1.0.catalina.bottle.tar.gz
           ccache -M 2G  # See .github/workflows/readme.md for ccache strategy.
 
       - name: Config and build wheel
@@ -209,21 +221,21 @@ jobs:
 
   test-wheel:
     name: Test wheel
-    runs-on: macos-10.15
+    runs-on: macos-12
     needs: [build-wheel]
     strategy:
       fail-fast: false
       matrix:
-        python_version: [3.6, 3.7, 3.8, 3.9]
+        python_version: ['3.7', '3.8', '3.9', '3.10']
         is_master:
           - ${{ github.ref == 'refs/heads/master' }}
         exclude:
           - is_master: false
-            python_version: 3.7
+            python_version: '3.7'
           - is_master: false
-            python_version: 3.8
+            python_version: '3.8'
           - is_master: false
-            python_version: 3.9
+            python_version: '3.9'
 
     env:
       OPEN3D_ML_ROOT: ${{ github.workspace }}/Open3D-ML

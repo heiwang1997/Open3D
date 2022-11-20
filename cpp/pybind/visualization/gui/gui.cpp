@@ -153,7 +153,8 @@ void install_cleanup_atexit() {
     }
 }
 
-void InitializeForPython(std::string resource_path /*= ""*/) {
+void InitializeForPython(std::string resource_path /*= ""*/,
+                         bool headless /*= false*/) {
     if (resource_path.empty()) {
         // We need to find the resources directory. Fortunately,
         // Python knows where the module lives (open3d.__file__
@@ -167,7 +168,11 @@ void InitializeForPython(std::string resource_path /*= ""*/) {
         resource_path = module_path + "/resources";
     }
     Application::GetInstance().Initialize(resource_path.c_str());
-    install_cleanup_atexit();
+    // NOTE: The PyOffscreenRenderer takes care of cleaning itself up so the
+    // atext is not necessary
+    if (!headless) {
+        install_cleanup_atexit();
+    }
 }
 
 std::shared_ptr<geometry::Image> RenderToImageWithoutWindow(
@@ -1342,12 +1347,12 @@ void pybind_gui_classes(py::module &m) {
                  "Sets a callback for mouse events. This callback is passed "
                  "a MouseEvent object. The callback must return "
                  "EventCallbackResult.IGNORED, EventCallbackResult.HANDLED, "
-                 "or EventCallackResult.CONSUMED.")
+                 "or EventCallbackResult.CONSUMED.")
             .def("set_on_key", &PySceneWidget::SetOnKey,
                  "Sets a callback for key events. This callback is passed "
                  "a KeyEvent object. The callback must return "
                  "EventCallbackResult.IGNORED, EventCallbackResult.HANDLED, "
-                 "or EventCallackResult.CONSUMED.")
+                 "or EventCallbackResult.CONSUMED.")
             .def("set_on_sun_direction_changed",
                  &PySceneWidget::SetOnSunDirectionChanged,
                  "Callback when user changes sun direction (only called in "
