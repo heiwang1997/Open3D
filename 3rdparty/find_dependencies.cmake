@@ -1167,7 +1167,7 @@ if(BUILD_GUI)
     )
     # Add internal dependencies...
     target_include_directories(3rdparty_implot PRIVATE ${IMGUI_SOURCE_DIR})
-    list(APPEND Open3D_3RDPARTY_PRIVATE_TARGETS Open3D::3rdparty_implot)
+    list(APPEND Open3D_3RDPARTY_PRIVATE_TARGETS_FROM_CUSTOM Open3D::3rdparty_implot)
 endif()
 
 # Filament

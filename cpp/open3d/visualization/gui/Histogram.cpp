@@ -37,7 +37,7 @@
 
 // Expose more implot functions that is helpful to draw ramp histogram.
 namespace ImPlot {
-bool BeginItem(const char* label_id, ImPlotCol recolor_from);
+bool BeginItem(const char* label_id, ImPlotItemFlags flags, ImPlotCol recolor_from);
 void EndItem();
 ImU32 SampleColormapU32(float t, ImPlotColormap cmap);
 }
@@ -109,13 +109,12 @@ Histogram::DrawResult Histogram::Draw(const DrawContext& context) {
     ImGui::Begin((impl_->win_title_ + impl_->id_).c_str(), nullptr, ImGuiWindowFlags_NoCollapse);
     
     if (ImPlot::BeginPlot("Distribution##Histograms", 
-        0, 0,   // No x/y labels,
         ImGui::GetContentRegionAvail(),
-        ImPlotFlags_NoTitle | ImPlotFlags_NoLegend | ImPlotFlags_NoBoxSelect,
-        ImPlotAxisFlags_AutoFit,
-        ImPlotAxisFlags_AutoFit | ImPlotAxisFlags_NoTickMarks | ImPlotAxisFlags_NoTickLabels
+        ImPlotFlags_NoTitle | ImPlotFlags_NoLegend | ImPlotFlags_NoBoxSelect
     )) {
-        if (ImPlot::BeginItem("PC1", ImPlotCol_Fill)) {
+        ImPlot::SetupAxis(ImAxis_X1, 0, ImPlotAxisFlags_AutoFit);
+        ImPlot::SetupAxis(ImAxis_Y1, 0, ImPlotAxisFlags_AutoFit | ImPlotAxisFlags_NoTickMarks | ImPlotAxisFlags_NoTickLabels);
+        if (ImPlot::BeginItem("PC1", 0, ImPlotCol_Fill)) {
             ImDrawList& DrawList = *ImPlot::GetPlotDrawList();
             int n_bars = impl_->values_.rows();
             const double half_width = (impl_->v_max_ - impl_->v_min_) / (n_bars - 1) / 2;
