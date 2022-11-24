@@ -153,13 +153,13 @@ bool ViewControl::ConvertToPinholeCameraParameters(
                 "because window height and width are not set.");
         return false;
     }
-    if (GetProjectionType() == ProjectionType::Orthogonal) {
-        utility::LogWarning(
-                "[ViewControl] ConvertToPinholeCameraParameters() failed "
-                "because orthogonal view cannot be translated to a pinhole "
-                "camera.");
-        return false;
-    }
+    // if (GetProjectionType() == ProjectionType::Orthogonal) {
+    //     utility::LogWarning(
+    //             "[ViewControl] ConvertToPinholeCameraParameters() failed "
+    //             "because orthogonal view cannot be translated to a pinhole "
+    //             "camera.");
+    //     return false;
+    // }
     SetProjectionParameters();
     auto intrinsic = camera::PinholeCameraIntrinsic();
     intrinsic.width_ = window_width_;
