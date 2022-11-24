@@ -3,7 +3,9 @@
 ## NOTE
 
 I will work on my master branch, and merge with upstream using the following command.
-List all files without untracked ones with `gst -uno`
+List all files without untracked ones with `gst -uno`.
+
+This master branch will be named `open3d-pycg` in PyPI. The CI/CD workflow will be automatically executed once pushed.
 
 ## Merging with upstream head
 
