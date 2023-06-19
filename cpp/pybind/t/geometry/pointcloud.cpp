@@ -1,27 +1,8 @@
 // ----------------------------------------------------------------------------
 // -                        Open3D: www.open3d.org                            -
 // ----------------------------------------------------------------------------
-// The MIT License (MIT)
-//
-// Copyright (c) 2018-2021 www.open3d.org
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-// IN THE SOFTWARE.
+// Copyright (c) 2018-2023 www.open3d.org
+// SPDX-License-Identifier: MIT
 // ----------------------------------------------------------------------------
 
 #include "open3d/t/geometry/PointCloud.h"
@@ -126,6 +107,8 @@ The attributes of the point cloud have different levels::
                                                    core::Tensor>&>(),
                  "map_keys_to_tensors"_a)
             .def("__repr__", &PointCloud::ToString);
+
+    py::detail::bind_copy_functions<PointCloud>(pointcloud);
 
     // Pickle support.
     pointcloud.def(py::pickle(
@@ -475,7 +458,7 @@ Example:
                                                  ransac_n=3,
                                                  num_iterations=1000)
         inlier_cloud = pcd.select_by_index(inliers)
-        inlier_cloud.paint_uniform_color([1.0, 0, 0])
+        inlier_cloud = inlier_cloud.paint_uniform_color([1.0, 0, 0])
         outlier_cloud = pcd.select_by_index(inliers, invert=True)
         o3d.visualization.draw([inlier_cloud, outlier_cloud]))");
     pointcloud.def(
@@ -536,9 +519,21 @@ Example:
             "get_axis_aligned_bounding_box",
             &PointCloud::GetAxisAlignedBoundingBox,
             "Create an axis-aligned bounding box from attribute 'positions'.");
-    pointcloud.def("crop", &PointCloud::Crop,
+    pointcloud.def(
+            "get_oriented_bounding_box", &PointCloud::GetOrientedBoundingBox,
+            "Create an oriented bounding box from attribute 'positions'.");
+    pointcloud.def("crop",
+                   (PointCloud(PointCloud::*)(const AxisAlignedBoundingBox&,
+                                              bool) const) &
+                           PointCloud::Crop,
                    "Function to crop pointcloud into output pointcloud.",
                    "aabb"_a, "invert"_a = false);
+    pointcloud.def("crop",
+                   (PointCloud(PointCloud::*)(const OrientedBoundingBox&, bool)
+                            const) &
+                           PointCloud::Crop,
+                   "Function to crop pointcloud into output pointcloud.",
+                   "obb"_a, "invert"_a = false);
 
     docstring::ClassMethodDocInject(m, "PointCloud", "estimate_normals",
                                     map_shared_argument_docstrings);
@@ -606,7 +601,12 @@ Example:
              {"invert",
               "Crop the points outside of the bounding box or inside of the "
               "bounding box."}});
-
+    docstring::ClassMethodDocInject(
+            m, "PointCloud", "crop",
+            {{"obb", "OrientedBoundingBox to crop points."},
+             {"invert",
+              "Crop the points outside of the bounding box or inside of the "
+              "bounding box."}});
     pointcloud.def("extrude_rotation", &PointCloud::ExtrudeRotation, "angle"_a,
                    "axis"_a, "resolution"_a = 16, "translation"_a = 0.0,
                    "capping"_a = true,
@@ -661,6 +661,30 @@ Example:
         lines = pcd.extrude_linear([0,1,0])
         o3d.visualization.draw([{'name': 'lines', 'geometry': lines}])
 
+)");
+
+    pointcloud.def("pca_partition", &PointCloud::PCAPartition, "max_points"_a,
+                   R"(Partition the point cloud by recursively doing PCA.
+
+This function creates a new point attribute with the name "partition_ids" storing 
+the partition id for each point.
+
+Args:
+    max_points (int): The maximum allowed number of points in a partition.
+
+
+Example:
+
+    This code computes parititions a point cloud such that each partition
+    contains at most 20 points::
+
+        import open3d as o3d
+        import numpy as np
+        pcd = o3d.t.geometry.PointCloud(np.random.rand(100,3))
+        num_partitions = pcd.pca_partition(max_points=20)
+
+        # print the partition ids and the number of points for each of them.
+        print(np.unique(pcd.point.partition_ids.numpy(), return_counts=True))
 
 )");
 }

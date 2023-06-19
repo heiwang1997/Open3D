@@ -1,27 +1,8 @@
 // ----------------------------------------------------------------------------
 // -                        Open3D: www.open3d.org                            -
 // ----------------------------------------------------------------------------
-// The MIT License (MIT)
-//
-// Copyright (c) 2018-2021 www.open3d.org
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-// IN THE SOFTWARE.
+// Copyright (c) 2018-2023 www.open3d.org
+// SPDX-License-Identifier: MIT
 // ----------------------------------------------------------------------------
 
 #include "open3d/t/pipelines/kernel/Registration.h"
@@ -54,6 +35,7 @@ core::Tensor ComputePosePointToPlane(const core::Tensor &source_points,
                 correspondence_indices.Contiguous(), pose, residual,
                 inlier_count, source_points.GetDtype(), device, kernel);
     } else if (source_points.IsCUDA()) {
+        core::CUDAScopedDevice scoped_device(source_points.GetDevice());
         CUDA_CALL(ComputePosePointToPlaneCUDA, source_points.Contiguous(),
                   target_points.Contiguous(), target_normals.Contiguous(),
                   correspondence_indices.Contiguous(), pose, residual,
@@ -94,6 +76,7 @@ core::Tensor ComputePoseColoredICP(const core::Tensor &source_points,
                 inlier_count, source_points.GetDtype(), device, kernel,
                 lambda_geometric);
     } else if (source_points.IsCUDA()) {
+        core::CUDAScopedDevice scoped_device(source_points.GetDevice());
         CUDA_CALL(ComputePoseColoredICPCUDA, source_points.Contiguous(),
                   source_colors.Contiguous(), target_points.Contiguous(),
                   target_normals.Contiguous(), target_colors.Contiguous(),
@@ -130,6 +113,7 @@ std::tuple<core::Tensor, core::Tensor> ComputeRtPointToPoint(
                 source_points.GetDtype(), device);
     } else if (source_points.IsCUDA()) {
 #ifdef BUILD_CUDA_MODULE
+        core::CUDAScopedDevice scoped_device(source_points.GetDevice());
         // TODO: Implement optimized CUDA reduction kernel.
         core::Tensor valid = correspondence_indices.Ne(-1).Reshape({-1});
         // correpondence_set : (i, corres[i]).
@@ -198,6 +182,7 @@ core::Tensor ComputeInformationMatrix(
                 target_points.Contiguous(), correspondence_indices.Contiguous(),
                 information_matrix, target_points.GetDtype(), device);
     } else if (target_points.IsCUDA()) {
+        core::CUDAScopedDevice scoped_device(target_points.GetDevice());
         CUDA_CALL(ComputeInformationMatrixCUDA, target_points.Contiguous(),
                   correspondence_indices.Contiguous(), information_matrix,
                   target_points.GetDtype(), device);

@@ -1,27 +1,8 @@
 // ----------------------------------------------------------------------------
 // -                        Open3D: www.open3d.org                            -
 // ----------------------------------------------------------------------------
-// The MIT License (MIT)
-//
-// Copyright (c) 2018-2021 www.open3d.org
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-// IN THE SOFTWARE.
+// Copyright (c) 2018-2023 www.open3d.org
+// SPDX-License-Identifier: MIT
 // ----------------------------------------------------------------------------
 
 #include "open3d/t/geometry/LineSet.h"
@@ -110,6 +91,7 @@ and ``device`` as the tensor. The device for ``point_positions`` must be consist
              {"line_indices",
               "A tensor with element shape (2,) and Int dtype."}});
 
+    py::detail::bind_copy_functions<LineSet>(line_set);
     // Pickling support.
     line_set.def(py::pickle(
             [](const LineSet& line_set) {
@@ -260,7 +242,9 @@ transformation as :math:`P = R(P) + t`)");
                  &LineSet::GetAxisAlignedBoundingBox,
                  "Create an axis-aligned bounding box from point attribute "
                  "'positions'.");
-
+    line_set.def("get_oriented_bounding_box", &LineSet::GetOrientedBoundingBox,
+                 "Create an oriented bounding box from point attribute "
+                 "'positions'.");
     line_set.def("extrude_rotation", &LineSet::ExtrudeRotation, "angle"_a,
                  "axis"_a, "resolution"_a = 16, "translation"_a = 0.0,
                  "capping"_a = true,

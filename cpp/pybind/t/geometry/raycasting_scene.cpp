@@ -1,27 +1,8 @@
 // ----------------------------------------------------------------------------
 // -                        Open3D: www.open3d.org                            -
 // ----------------------------------------------------------------------------
-// The MIT License (MIT)
-//
-// Copyright (c) 2018-2021 www.open3d.org
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-// IN THE SOFTWARE.
+// Copyright (c) 2018-2023 www.open3d.org
+// SPDX-License-Identifier: MIT
 // ----------------------------------------------------------------------------
 
 #include "open3d/t/geometry/RaycastingScene.h"
@@ -253,9 +234,9 @@ Returns:
     A tensor with the distances to the surface. The shape is {..}.
 )doc");
 
-    raycasting_scene.def("compute_signed_distance",
-                         &RaycastingScene::ComputeSignedDistance,
-                         "query_points"_a, "nthreads"_a = 0, R"doc(
+    raycasting_scene.def(
+            "compute_signed_distance", &RaycastingScene::ComputeSignedDistance,
+            "query_points"_a, "nthreads"_a = 0, "nsamples"_a = 1, R"doc(
 Computes the signed distance to the surface of the scene.
 
 This function computes the signed distance to the meshes in the scene.
@@ -274,6 +255,11 @@ Args:
 
     nthreads (int): The number of threads to use. Set to 0 for automatic.
 
+    nsamples (int): The number of rays used for determining the inside.
+        This must be an odd number. The default is 1. Use a higher value if you
+        notice sign flipping, which can occur when rays hit exactly an edge or 
+        vertex in the scene.
+
 Returns:
     A tensor with the signed distances to the surface. The shape is {..}.
     Negative distances mean a point is inside a closed surface.
@@ -281,7 +267,7 @@ Returns:
 
     raycasting_scene.def("compute_occupancy",
                          &RaycastingScene::ComputeOccupancy, "query_points"_a,
-                         "nthreads"_a = 0,
+                         "nthreads"_a = 0, "nsamples"_a = 1,
                          R"doc(
 Computes the occupancy at the query point positions.
 
@@ -300,6 +286,11 @@ Args:
         The last dimension must be 3 and has the format [x, y, z].
 
     nthreads (int): The number of threads to use. Set to 0 for automatic.
+
+    nsamples (int): The number of rays used for determining the inside.
+        This must be an odd number. The default is 1. Use a higher value if you
+        notice errors in the occupancy values. Errors can occur when rays hit
+        exactly an edge or vertex in the scene.
 
 Returns:
     A tensor with the occupancy values. The shape is {..}. Values are either 0

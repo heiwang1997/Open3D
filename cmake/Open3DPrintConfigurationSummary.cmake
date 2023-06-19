@@ -74,6 +74,7 @@ function(open3d_print_configuration_summary)
     set(3RDPARTY_DEPENDENCIES
         Assimp
         BLAS
+        curl
         Eigen3
         filament
         fmt
@@ -96,6 +97,7 @@ function(open3d_print_configuration_summary)
         tinyfiledialogs
         TinyGLTF
         tinyobjloader
+        VTK
         WebRTC
         ZeroMQ
     )

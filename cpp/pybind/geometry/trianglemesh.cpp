@@ -1,27 +1,8 @@
 // ----------------------------------------------------------------------------
 // -                        Open3D: www.open3d.org                            -
 // ----------------------------------------------------------------------------
-// The MIT License (MIT)
-//
-// Copyright (c) 2018-2021 www.open3d.org
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-// IN THE SOFTWARE.
+// Copyright (c) 2018-2023 www.open3d.org
+// SPDX-License-Identifier: MIT
 // ----------------------------------------------------------------------------
 
 #include "open3d/geometry/TriangleMesh.h"
@@ -355,6 +336,12 @@ void pybind_trianglemesh(py::module &m) {
                         "Kazhdan. See https://github.com/mkazhdan/PoissonRecon",
                         "pcd"_a, "depth"_a = 8, "width"_a = 0, "scale"_a = 1.1,
                         "linear_fit"_a = false, "n_threads"_a = -1)
+            .def_static(
+                    "create_from_oriented_bounding_box",
+                    &TriangleMesh::CreateFromOrientedBoundingBox,
+                    "Factory function to create a solid oriented bounding box.",
+                    "obox"_a, "scale"_a = Eigen::Vector3d::Ones(),
+                    "create_uv_map"_a = false)
             .def_static("create_box", &TriangleMesh::CreateBox,
                         "Factory function to create a box. The left bottom "
                         "corner on the "
@@ -693,6 +680,12 @@ void pybind_trianglemesh(py::module &m) {
              {"n_threads",
               "Number of threads used for reconstruction. Set to -1 to "
               "automatically determine it."}});
+    docstring::ClassMethodDocInject(
+            m, "TriangleMesh", "create_from_oriented_bounding_box",
+            {{"obox", "OrientedBoundingBox object to create mesh of."},
+             {"scale",
+              "scale factor along each direction of OrientedBoundingBox"},
+             {"create_uv_map", "Add default uv map to the mesh."}});
     docstring::ClassMethodDocInject(
             m, "TriangleMesh", "create_box",
             {{"width", "x-directional length."},

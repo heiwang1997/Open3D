@@ -1,27 +1,8 @@
 // ----------------------------------------------------------------------------
 // -                        Open3D: www.open3d.org                            -
 // ----------------------------------------------------------------------------
-// The MIT License (MIT)
-//
-// Copyright (c) 2018-2021 www.open3d.org
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-// IN THE SOFTWARE.
+// Copyright (c) 2018-2023 www.open3d.org
+// SPDX-License-Identifier: MIT
 // ----------------------------------------------------------------------------
 
 #include "open3d/geometry/PointCloud.h"
@@ -224,6 +205,21 @@ Returns:
                  "algorithm.",
                  "distance_threshold"_a, "ransac_n"_a, "num_iterations"_a,
                  "probability"_a = 0.99999999)
+            .def("detect_planar_patches", &PointCloud::DetectPlanarPatches,
+                 R"doc(
+Detects planar patches in the point cloud using a robust statistics-based approach.
+
+Returns:
+     A list of detected planar patches, represented as
+     OrientedBoundingBox objects, with the third column (z) of R indicating
+     the planar patch normal vector. The extent in the z direction is
+     non-zero so that the OrientedBoundingBox contains the points that
+     contribute to the plane detection.
+)doc",
+                 "normal_variance_threshold_deg"_a = 60,
+                 "coplanarity_deg"_a = 75, "outlier_ratio"_a = 0.75,
+                 "min_plane_edge_length"_a = 0.0, "min_num_points"_a = 0,
+                 "search_param"_a = KDTreeSearchParamKNN())
             .def_static(
                     "create_from_depth_image",
                     &PointCloud::CreateFromDepthImage,
@@ -378,6 +374,30 @@ camera. Given depth value d at (u, v) image coordinate, the corresponding 3d poi
              {"num_iterations", "Number of iterations."},
              {"probability",
               "Expected probability of finding the optimal plane."}});
+    docstring::ClassMethodDocInject(
+            m, "PointCloud", "detect_planar_patches",
+            {
+                    {"normal_similarity",
+                     "Angle threshold based on robust statistics for planarity "
+                     "test. Larger values allow more noisy planes to be "
+                     "detected."},
+                    {"coplanarity",
+                     "Angle threshold based on robust statistics for planarity "
+                     "test. Smaller values allow more noisy planes to be "
+                     "detected."},
+                    {"outlier_ratio",
+                     "Maximum allowable ratio of outliers "
+                     "associated to a plane."},
+                    {"min_plane_edge_length",
+                     "Minimum edge length of plane's long "
+                     "edge before being rejected."},
+                    {"min_num_points",
+                     "Minimum number of points allowable for "
+                     "fitting planes."},
+                    {"search_param",
+                     "The KDTree search parameters for "
+                     "neighborhood search."},
+            });
     docstring::ClassMethodDocInject(
             m, "PointCloud", "create_from_depth_image",
             {{"depth",
