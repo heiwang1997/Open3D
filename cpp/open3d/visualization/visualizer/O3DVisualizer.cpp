@@ -2118,7 +2118,7 @@ struct O3DVisualizer::Impl {
             } else {
                 pickable.emplace_back(o.name, o.geometry.get(),
                                       o.tgeometry.get());
-                pickable.back().transform = scene_->GetScene()->GetGeometryTransform(o.name)
+                pickable.back().transform = scene_->GetScene()->GetGeometryTransform(o.name);
             }
         }
         selections_->SetSelectableGeometry(pickable);
