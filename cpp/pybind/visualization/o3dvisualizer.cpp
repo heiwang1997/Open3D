@@ -1,27 +1,8 @@
 // ----------------------------------------------------------------------------
 // -                        Open3D: www.open3d.org                            -
 // ----------------------------------------------------------------------------
-// The MIT License (MIT)
-//
-// Copyright (c) 2018-2021 www.open3d.org
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-// IN THE SOFTWARE.
+// Copyright (c) 2018-2023 www.open3d.org
+// SPDX-License-Identifier: MIT
 // ----------------------------------------------------------------------------
 
 #include "open3d/visualization/visualizer/O3DVisualizer.h"
@@ -127,7 +108,7 @@ void pybind_o3dvisualizer(py::module& m) {
                           "True if the object is checked in the list. "
                           "If the object's group is unchecked or an "
                           "animation is playing, the object's "
-                          "visiblity may not correspond with this "
+                          "visibility may not correspond with this "
                           "value");
 
     o3dvis.def(py::init<const std::string, int, int, O3DVisualizer::ConstructParams>(), "title"_a = "Open3D",
@@ -368,7 +349,10 @@ void pybind_o3dvisualizer(py::module& m) {
                  "current IBL")
             .def("enable_raw_mode", &O3DVisualizer::EnableBasicMode,
                  "enable_raw_mode(enable): Enables/disables raw mode for "
-                 "simplified lighting envirnment.")
+                 "simplified lighting environment.")
+            .def("enable_wireframe_mode", &O3DVisualizer::EnableWireframeMode,
+                 "enable_wireframe_mode(enable): Enables/disables wireframe mode for "
+                 "visualizing wireframe.")
             .def("enable_sun_follows_camera", &O3DVisualizer::EnableSunFollowsCamera,
                  "enable_sun_follows_camera(enable): Enables/disables whether sun "
                  "should follow the camera direction.")

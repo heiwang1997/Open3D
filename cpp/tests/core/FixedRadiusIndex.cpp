@@ -1,27 +1,8 @@
 // ----------------------------------------------------------------------------
 // -                        Open3D: www.open3d.org                            -
 // ----------------------------------------------------------------------------
-// The MIT License (MIT)
-//
-// Copyright (c) 2018-2021 www.open3d.org
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-// IN THE SOFTWARE.
+// Copyright (c) 2018-2023 www.open3d.org
+// SPDX-License-Identifier: MIT
 // ----------------------------------------------------------------------------
 
 #include "open3d/core/nns/FixedRadiusIndex.h"
@@ -105,7 +86,7 @@ TEST(FixedRadiusIndex, SearchRadius) {
     core::SizeVector shape{2};
     gt_indices = core::Tensor::Init<int32_t>({1, 4}, device);
     gt_distances = core::Tensor::Init<float>({0.00626358, 0.00747938}, device);
-    gt_neighbors_row_splits = core::Tensor::Init<int64_t>({0, 2}, device);
+    gt_neighbors_row_splits = core::Tensor::Init<int32_t>({0, 2}, device);
 
     std::tie(indices, distances, neighbors_row_splits) =
             index32.SearchRadius(query_points, radius);
@@ -124,6 +105,7 @@ TEST(FixedRadiusIndex, SearchRadius) {
     // if raidus == 0.1
     shape = core::SizeVector{2};
     gt_indices = core::Tensor::Init<int64_t>({1, 4}, device);
+    gt_neighbors_row_splits = gt_neighbors_row_splits.To(core::Int64);
 
     std::tie(indices, distances, neighbors_row_splits) =
             index64.SearchRadius(query_points, radius);
@@ -182,7 +164,10 @@ TEST(FixedRadiusIndex, SearchRadiusBatch) {
             0.0401310, 0.169365, 0.126971, 0.247414, 0.117165,  0.124805,
             0.192050,  0.196358, 0.229541, 0.247814, 0.015753,  0.18135,
             0.192298};
-    std::vector<int64_t> gt_neighbors_row_splits = {
+    std::vector<int32_t> gt_neighbors_row_splits_32 = {
+            0,  3,  4,  5,  7,  8,  10, 11, 13, 17, 20, 21, 25,
+            29, 32, 32, 35, 36, 38, 40, 45, 48, 50, 52, 58, 61};
+    std::vector<int64_t> gt_neighbors_row_splits_64 = {
             0,  3,  4,  5,  7,  8,  10, 11, 13, 17, 20, 21, 25,
             29, 32, 32, 35, 36, 38, 40, 45, 48, 50, 52, 58, 61};
 
@@ -205,8 +190,8 @@ TEST(FixedRadiusIndex, SearchRadiusBatch) {
 
     // Check neighbor_row_splits first, since indices and distances checks are
     // dependent on the row splits value.
-    ASSERT_EQ(neighbors_row_splits.ToFlatVector<int64_t>(),
-              gt_neighbors_row_splits);
+    ASSERT_EQ(neighbors_row_splits.ToFlatVector<int32_t>(),
+              gt_neighbors_row_splits_32);
 
     std::vector<int32_t> indices_vector32 = indices.ToFlatVector<int32_t>();
     std::vector<float> distances_vector32 = distances.ToFlatVector<float>();
@@ -215,27 +200,28 @@ TEST(FixedRadiusIndex, SearchRadiusBatch) {
     std::vector<float> gt_distances_sorted32(gt_distances.begin(),
                                              gt_distances.end());
 
-    for (size_t i = 0; i < gt_neighbors_row_splits.size() - 1; i++) {
-        int64_t size_i =
-                gt_neighbors_row_splits[i + 1] - gt_neighbors_row_splits[i];
+    for (size_t i = 0; i < gt_neighbors_row_splits_32.size() - 1; i++) {
+        int32_t size_i = gt_neighbors_row_splits_32[i + 1] -
+                         gt_neighbors_row_splits_32[i];
 
         // Sort predicted indices and distances
         std::vector<size_t> p_i = FindPermutation<int32_t>(
-                indices_vector32.data() + gt_neighbors_row_splits[i], size_i);
-        ApplyPermutation(indices_vector32.data() + gt_neighbors_row_splits[i],
-                         p_i);
-        ApplyPermutation(distances_vector32.data() + gt_neighbors_row_splits[i],
-                         p_i);
+                indices_vector32.data() + gt_neighbors_row_splits_32[i],
+                size_i);
+        ApplyPermutation(
+                indices_vector32.data() + gt_neighbors_row_splits_32[i], p_i);
+        ApplyPermutation(
+                distances_vector32.data() + gt_neighbors_row_splits_32[i], p_i);
 
         // Sort gt indices and distances
         std::vector<size_t> gt_p_i = FindPermutation<int32_t>(
-                gt_indices_sorted32.data() + gt_neighbors_row_splits[i],
+                gt_indices_sorted32.data() + gt_neighbors_row_splits_32[i],
                 size_i);
         ApplyPermutation(
-                gt_indices_sorted32.data() + gt_neighbors_row_splits[i],
+                gt_indices_sorted32.data() + gt_neighbors_row_splits_32[i],
                 gt_p_i);
         ApplyPermutation(
-                gt_distances_sorted32.data() + gt_neighbors_row_splits[i],
+                gt_distances_sorted32.data() + gt_neighbors_row_splits_32[i],
                 gt_p_i);
     }
 
@@ -247,8 +233,8 @@ TEST(FixedRadiusIndex, SearchRadiusBatch) {
             query_points, query_points_row_splits, radius, /*sort*/ true);
     ExpectEQ(indices.ToFlatVector<int32_t>(), gt_indices32);
     ExpectEQ(distances.ToFlatVector<float>(), gt_distances);
-    ExpectEQ(neighbors_row_splits.ToFlatVector<int64_t>(),
-             gt_neighbors_row_splits);
+    ExpectEQ(neighbors_row_splits.ToFlatVector<int32_t>(),
+             gt_neighbors_row_splits_32);
 
     // int64
     // Set up index.
@@ -268,7 +254,7 @@ TEST(FixedRadiusIndex, SearchRadiusBatch) {
     // Check neighbor_row_splits first, since indices and distances checks are
     // dependent on the row splits value.
     ASSERT_EQ(neighbors_row_splits.ToFlatVector<int64_t>(),
-              gt_neighbors_row_splits);
+              gt_neighbors_row_splits_64);
 
     std::vector<int64_t> indices_vector64 = indices.ToFlatVector<int64_t>();
     std::vector<float> distances_vector64 = distances.ToFlatVector<float>();
@@ -277,27 +263,28 @@ TEST(FixedRadiusIndex, SearchRadiusBatch) {
     std::vector<float> gt_distances_sorted64(gt_distances.begin(),
                                              gt_distances.end());
 
-    for (size_t i = 0; i < gt_neighbors_row_splits.size() - 1; i++) {
-        int64_t size_i =
-                gt_neighbors_row_splits[i + 1] - gt_neighbors_row_splits[i];
+    for (size_t i = 0; i < gt_neighbors_row_splits_64.size() - 1; i++) {
+        int64_t size_i = gt_neighbors_row_splits_64[i + 1] -
+                         gt_neighbors_row_splits_64[i];
 
         // Sort predicted indices and distances
         std::vector<size_t> p_i = FindPermutation<int64_t>(
-                indices_vector64.data() + gt_neighbors_row_splits[i], size_i);
-        ApplyPermutation(indices_vector64.data() + gt_neighbors_row_splits[i],
-                         p_i);
-        ApplyPermutation(distances_vector64.data() + gt_neighbors_row_splits[i],
-                         p_i);
+                indices_vector64.data() + gt_neighbors_row_splits_64[i],
+                size_i);
+        ApplyPermutation(
+                indices_vector64.data() + gt_neighbors_row_splits_64[i], p_i);
+        ApplyPermutation(
+                distances_vector64.data() + gt_neighbors_row_splits_64[i], p_i);
 
         // Sort gt indices and distances
         std::vector<size_t> gt_p_i = FindPermutation<int64_t>(
-                gt_indices_sorted64.data() + gt_neighbors_row_splits[i],
+                gt_indices_sorted64.data() + gt_neighbors_row_splits_64[i],
                 size_i);
         ApplyPermutation(
-                gt_indices_sorted64.data() + gt_neighbors_row_splits[i],
+                gt_indices_sorted64.data() + gt_neighbors_row_splits_64[i],
                 gt_p_i);
         ApplyPermutation(
-                gt_distances_sorted64.data() + gt_neighbors_row_splits[i],
+                gt_distances_sorted64.data() + gt_neighbors_row_splits_64[i],
                 gt_p_i);
     }
 
@@ -310,7 +297,7 @@ TEST(FixedRadiusIndex, SearchRadiusBatch) {
     ExpectEQ(indices.ToFlatVector<int64_t>(), gt_indices64);
     ExpectEQ(distances.ToFlatVector<float>(), gt_distances);
     ExpectEQ(neighbors_row_splits.ToFlatVector<int64_t>(),
-             gt_neighbors_row_splits);
+             gt_neighbors_row_splits_64);
 }
 
 TEST(FixedRadiusIndex, SearchHybrid) {

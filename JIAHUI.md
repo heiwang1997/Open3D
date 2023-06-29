@@ -3,7 +3,21 @@
 ## NOTE
 
 I will work on my master branch, and merge with upstream using the following command.
-List all files without untracked ones with `gst -uno`
+List all files without untracked ones with `gst -uno`.
+
+The CI/CD workflow will be automatically executed once pushed.
+I delete something from `.github/workflow` to make the display more concentrated.
+
+> I tried to name my mod `open3d-pycg` in PyPI, but failed (PEP 440 doesn't allow git revision as version number + 100MB file upload limit).
+> To make pip auto determine version, I set up my own PyPI using the tutorial from [here](https://testdriven.io/blog/private-pypi/).
+
+So the procedure now goes like:
+1. Push to Github and Download the new artifact.
+2. Put the artifacts, i.e., whl files, into `whl_packages` and run `python create_index.py` there.
+3. Upload the artifacts as well as the updated `index.html` into S3 pycg bucket.
+
+2. ~~Upload the artifact to `eagle` under `/root/pypi/packages`~~
+3. ~~Install via `pip install -U --index-url http://eagle.huangjh.tech:8080 --trusted-host eagle.huangjh.tech open3d`~~
 
 ## Merging with upstream head
 
@@ -49,3 +63,4 @@ make install-pip-package
 15. Add `gui.Keyframer` to support animation editing.
 16. Enable backface culling binding (double-sided) in filament.
 17. Enable selecting model and edit its pose in the new viewer.
+18. Add `set_indirect_light_rotation` binding.

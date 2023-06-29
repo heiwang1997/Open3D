@@ -1,30 +1,12 @@
 // ----------------------------------------------------------------------------
 // -                        Open3D: www.open3d.org                            -
 // ----------------------------------------------------------------------------
-// The MIT License (MIT)
-//
-// Copyright (c) 2018-2021 www.open3d.org
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-// IN THE SOFTWARE.
+// Copyright (c) 2018-2023 www.open3d.org
+// SPDX-License-Identifier: MIT
 // ----------------------------------------------------------------------------
 //
 
+#include "open3d/core/CUDAUtils.h"
 #include "open3d/core/Tensor.h"
 #include "open3d/core/nns/FixedRadiusIndex.h"
 #include "open3d/core/nns/FixedRadiusSearchImpl.cuh"
@@ -42,6 +24,7 @@ void BuildSpatialHashTableCUDA(const Tensor& points,
                                const Tensor& hash_table_splits,
                                Tensor& hash_table_index,
                                Tensor& hash_table_cell_splits) {
+    CUDAScopedDevice scoped_device(points.GetDevice());
     const cudaStream_t stream = 0;
     int texture_alignment = 512;
 
@@ -90,6 +73,7 @@ void FixedRadiusSearchCUDA(const Tensor& points,
                            Tensor& neighbors_index,
                            Tensor& neighbors_row_splits,
                            Tensor& neighbors_distance) {
+    CUDAScopedDevice scoped_device(points.GetDevice());
     const cudaStream_t stream = 0;
     int texture_alignment = 512;
 
@@ -189,6 +173,7 @@ void HybridSearchCUDA(const Tensor& points,
                       Tensor& neighbors_index,
                       Tensor& neighbors_count,
                       Tensor& neighbors_distance) {
+    CUDAScopedDevice scoped_device(points.GetDevice());
     const cudaStream_t stream = 0;
 
     Device device = points.GetDevice();

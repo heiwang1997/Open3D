@@ -1,27 +1,8 @@
 # ----------------------------------------------------------------------------
 # -                        Open3D: www.open3d.org                            -
 # ----------------------------------------------------------------------------
-# The MIT License (MIT)
-#
-# Copyright (c) 2018-2021 www.open3d.org
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-# IN THE SOFTWARE.
+# Copyright (c) 2018-2023 www.open3d.org
+# SPDX-License-Identifier: MIT
 # ----------------------------------------------------------------------------
 
 import open3d as o3d
@@ -29,6 +10,7 @@ import open3d.core as o3c
 import numpy as np
 import pytest
 import tempfile
+import pickle
 
 import sys
 import os
@@ -663,6 +645,10 @@ def test_unary_ew_ops(device):
                                rtol=rtol,
                                atol=atol)
     np.testing.assert_allclose(src.neg().cpu().numpy(),
+                               -src_vals,
+                               rtol=rtol,
+                               atol=atol)
+    np.testing.assert_allclose((-src).cpu().numpy(),
                                -src_vals,
                                rtol=rtol,
                                atol=atol)
@@ -1584,3 +1570,22 @@ def test_iterator(device):
         o3_t_slice[:] = new_o3_t_slice
     np.testing.assert_equal(o3_t.cpu().numpy(),
                             np.array([[0, 10, 20], [30, 40, 50]]))
+
+
+@pytest.mark.parametrize("device", list_devices())
+def test_pickle(device):
+    o3_t = o3c.Tensor.ones((100), dtype=o3c.float32, device=device)
+    with tempfile.TemporaryDirectory() as temp_dir:
+        file_name = f"{temp_dir}/tensor.pkl"
+        pickle.dump(o3_t, open(file_name, "wb"))
+        o3_t_load = pickle.load(open(file_name, "rb"))
+        assert o3_t_load.device == device and o3_t_load.dtype == o3c.float32
+        np.testing.assert_equal(o3_t.cpu().numpy(), o3_t_load.cpu().numpy())
+
+        # Test with a non-contiguous tensor.
+        o3_t_nc = o3_t[0:100:2]
+        pickle.dump(o3_t_nc, open(file_name, "wb"))
+        o3_t_nc_load = pickle.load(open(file_name, "rb"))
+        assert o3_t_nc_load.is_contiguous()
+        np.testing.assert_equal(o3_t_nc.cpu().numpy(),
+                                o3_t_nc_load.cpu().numpy())

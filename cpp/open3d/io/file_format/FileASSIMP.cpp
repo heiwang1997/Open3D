@@ -1,27 +1,8 @@
 // ----------------------------------------------------------------------------
 // -                        Open3D: www.open3d.org                            -
 // ----------------------------------------------------------------------------
-// The MIT License (MIT)
-//
-// Copyright (c) 2018-2021 www.open3d.org
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-// IN THE SOFTWARE.
+// Copyright (c) 2018-2023 www.open3d.org
+// SPDX-License-Identifier: MIT
 // ----------------------------------------------------------------------------
 
 #include <fstream>
@@ -77,34 +58,66 @@ struct TextureImages {
 };
 
 void LoadTextures(const std::string& filename,
-                  aiMaterial* mat,
+                  const aiScene* scene,
+                  const aiMaterial* mat,
                   TextureImages& maps) {
     // Retrieve textures
     std::string base_path =
             utility::filesystem::GetFileParentDirectory(filename);
 
-    auto texture_loader = [&base_path, &mat](
+    auto texture_loader = [&base_path, &scene, &mat](
                                   aiTextureType type,
                                   std::shared_ptr<geometry::Image>& img) {
         if (mat->GetTextureCount(type) > 0) {
             aiString path;
             mat->GetTexture(type, 0, &path);
-            std::string strpath(path.C_Str());
-            // normalize path separators
-            auto p_win = strpath.find("\\");
-            while (p_win != std::string::npos) {
-                strpath[p_win] = '/';
-                p_win = strpath.find("\\", p_win + 1);
+            // If the texture is an embedded texture, use `GetEmbeddedTexture`.
+            if (auto texture = scene->GetEmbeddedTexture(path.C_Str())) {
+                if (texture->CheckFormat("png")) {
+                    auto image = io::CreateImageFromMemory(
+                            "png",
+                            reinterpret_cast<const unsigned char*>(
+                                    texture->pcData),
+                            texture->mWidth);
+                    if (image->HasData()) {
+                        img = image;
+                    }
+                } else if (texture->CheckFormat("jpg")) {
+                    auto image = io::CreateImageFromMemory(
+                            "jpg",
+                            reinterpret_cast<const unsigned char*>(
+                                    texture->pcData),
+                            texture->mWidth);
+                    if (image->HasData()) {
+                        img = image;
+                    }
+                }
+
+                else {
+                    utility::LogWarning(
+                            "This format of image is not supported.");
+                }
+
             }
-            // if absolute path convert to relative to base path
-            if (strpath.length() > 1 &&
-                (strpath[0] == '/' || strpath[1] == ':')) {
-                strpath = utility::filesystem::GetFileNameWithoutDirectory(
-                        strpath);
-            }
-            auto image = io::CreateImageFromFile(base_path + strpath);
-            if (image->HasData()) {
-                img = image;
+            // Else, build the path to it.
+            else {
+                std::string strpath(path.C_Str());
+                // Normalize path separators.
+                auto p_win = strpath.find("\\");
+                while (p_win != std::string::npos) {
+                    strpath[p_win] = '/';
+                    p_win = strpath.find("\\", p_win + 1);
+                }
+                // If absolute path convert to relative to base path.
+                if (strpath.length() > 1 &&
+                    (strpath[0] == '/' || strpath[1] == ':')) {
+                    strpath = utility::filesystem::GetFileNameWithoutDirectory(
+                            strpath);
+                }
+                auto image = io::CreateImageFromFile(base_path + strpath);
+                if (image->HasData()) {
+                    img = image;
+                }
             }
         }
     };
@@ -254,7 +267,7 @@ bool ReadTriangleMeshUsingASSIMP(
 
         // Retrieve textures
         TextureImages maps;
-        LoadTextures(filename, mat, maps);
+        LoadTextures(filename, scene, mat, maps);
         mesh_material.albedo = maps.albedo;
         mesh_material.normalMap = maps.normal;
         mesh_material.ambientOcclusion = maps.ao;
@@ -413,7 +426,7 @@ bool ReadModelUsingAssimp(const std::string& filename,
 
         // Retrieve textures
         TextureImages maps;
-        LoadTextures(filename, mat, maps);
+        LoadTextures(filename, scene, mat, maps);
         o3d_mat.albedo_img = maps.albedo;
         o3d_mat.normal_img = maps.normal;
         o3d_mat.ao_img = maps.ao;
