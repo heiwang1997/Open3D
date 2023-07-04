@@ -39,9 +39,9 @@ mv open3d*.whl whl_packages/
 # Append record given current wheels.
 python whl_packages/create_index.py
 # Upload index.html
-awsm cp whl_packages/index.html s3://pycg/open3d/ $AWSGA
+awsm cp whl_packages/index.html s3://pycg/packages/ $AWSGA
 # Upload wheels
-find whl_packages/ -name '*.whl' | while read file; do awsm cp $file s3://pycg/open3d/ $AWSGA; done
+find whl_packages/ -name '*.whl' | while read file; do awsm cp $file s3://pycg/packages/ $AWSGA; done
 ```
 
 ~~I tried to name my mod `open3d-pycg` in PyPI, but failed (PEP 440 doesn't allow git revision as version number + 100MB file upload limit). To make pip auto determine version, I set up my own PyPI using the tutorial from [here](https://testdriven.io/blog/private-pypi/).~~
