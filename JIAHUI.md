@@ -1,23 +1,6 @@
 # Jiahui's fork of Open3D
 
-## NOTE
-
 I will work on my master branch, and merge with upstream using the following command.
-List all files without untracked ones with `gst -uno`.
-
-The CI/CD workflow will be automatically executed once pushed.
-I delete something from `.github/workflow` to make the display more concentrated.
-
-> I tried to name my mod `open3d-pycg` in PyPI, but failed (PEP 440 doesn't allow git revision as version number + 100MB file upload limit).
-> To make pip auto determine version, I set up my own PyPI using the tutorial from [here](https://testdriven.io/blog/private-pypi/).
-
-So the procedure now goes like:
-1. Push to Github and Download the new artifact.
-2. Put the artifacts, i.e., whl files, into `whl_packages` and run `python create_index.py` there.
-3. Upload the artifacts as well as the updated `index.html` into S3 pycg bucket.
-
-2. ~~Upload the artifact to `eagle` under `/root/pypi/packages`~~
-3. ~~Install via `pip install -U --index-url http://eagle.huangjh.tech:8080 --trusted-host eagle.huangjh.tech open3d`~~
 
 ## Merging with upstream head
 
@@ -38,6 +21,33 @@ make -j
 ca
 make install-pip-package
 ```
+
+## Public Package
+
+To build public package, refer to the command in `.github/workflows/ubuntu-wheel.yml`:
+```bash
+docker/docker_build.sh cuda_wheel_py310_dev  # will add commit hash
+```
+The final artifact would be available at the current directory. Also a wheel named `open3d-ci` will be created for future usage.
+
+~~The CI/CD workflow will be automatically executed once pushed. I delete something from `.github/workflow` to make the display more concentrated.~~ (The GH CI/CD is completely disabled because it took too much space and my quota...)
+
+**Making Package Available Online**
+
+```bash
+mv open3d*.whl whl_packages/
+# Append record given current wheels.
+python whl_packages/create_index.py
+# Upload index.html
+awsm cp whl_packages/index.html s3://pycg/open3d/ $AWSGA
+# Upload wheels
+find whl_packages/ -name '*.whl' | while read file; do awsm cp $file s3://pycg/open3d/ $AWSGA; done
+```
+
+~~I tried to name my mod `open3d-pycg` in PyPI, but failed (PEP 440 doesn't allow git revision as version number + 100MB file upload limit). To make pip auto determine version, I set up my own PyPI using the tutorial from [here](https://testdriven.io/blog/private-pypi/).~~
+1. ~~Upload the artifact to `eagle` under `/root/pypi/packages`~~
+2. ~~Install via `pip install -U --index-url http://eagle.huangjh.tech:8080 --trusted-host eagle.huangjh.tech open3d`~~
+
 
 ## Modifications compared
 
