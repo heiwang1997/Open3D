@@ -165,13 +165,12 @@ void pybind_o3dvisualizer(py::module& m) {
                  "Sets a callback that will be called when the window is "
                  "closed. The callback is given no arguments and should return "
                  "True to continue closing the window or False to cancel the "
-                 "close")
+                 "close",
+                 "callback"_a)
             .def("set_on_key", &O3DVisualizer::SetOnKey,
                  "Set a key callback. Please see Jiahui's note.")
             .def("get_mouse_mods", &O3DVisualizer::GetMouseMods,
                  "Get current key modifiers.")
-                 "close",
-                 "callback"_a)
             .def("show_menu", &O3DVisualizer::ShowMenu,
                  "Shows or hides the menu in the window, except on macOS since "
                  "the menubar is not in the window and all applications must "
@@ -357,8 +356,9 @@ void pybind_o3dvisualizer(py::module& m) {
                  "enable_raw_mode(enable): Enables/disables raw mode for "
                  "simplified lighting environment.")
             .def("enable_wireframe_mode", &O3DVisualizer::EnableWireframeMode,
-                 "enable_wireframe_mode(enable): Enables/disables wireframe mode for "
-                 "visualizing wireframe.")
+                 "Enables/disables raw mode for simplified lighting "
+                 "environment.",
+                 "enable"_a)
             .def("enable_sun_follows_camera", &O3DVisualizer::EnableSunFollowsCamera,
                  "enable_sun_follows_camera(enable): Enables/disables whether sun "
                  "should follow the camera direction.")
@@ -366,9 +366,6 @@ void pybind_o3dvisualizer(py::module& m) {
                  "Show/Hide the skybox")
             .def("add_child", &O3DVisualizer::AddChild, 
                  "Add children (apart from 3D and settings.)")
-                 "Enables/disables raw mode for simplified lighting "
-                 "environment.",
-                 "enable"_a)
             .def("show_skybox", &O3DVisualizer::ShowSkybox,
                  "Show/Hide the skybox", "show"_a)
             .def_property(
