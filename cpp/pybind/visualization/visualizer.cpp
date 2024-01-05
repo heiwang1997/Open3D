@@ -71,7 +71,7 @@ void pybind_visualizer(py::module &m) {
             .def("close", &Visualizer::Close,
                  "Function to notify the window to be closed")
             .def("reset_view_point", &Visualizer::ResetViewPoint,
-                 "Function to reset view point")
+                 "Function to reset view point", "reset_bounding_box"_a = false)
             .def("update_geometry", &Visualizer::UpdateGeometry,
                  "Function to update geometry. This function must be called "
                  "when geometry has been changed. Otherwise the behavior of "
@@ -80,7 +80,8 @@ void pybind_visualizer(py::module &m) {
             .def("update_renderer", &Visualizer::UpdateRender,
                  "Function to inform render needed to be updated")
             .def("set_full_screen", &Visualizer::SetFullScreen,
-                 "Function to change between fullscreen and windowed")
+                 "Function to change between fullscreen and windowed",
+                 "fullscreen"_a)
             .def("toggle_full_screen", &Visualizer::ToggleFullScreen,
                  "Function to toggle between fullscreen and windowed")
             .def("is_full_screen", &Visualizer::IsFullScreen,
@@ -120,7 +121,14 @@ void pybind_visualizer(py::module &m) {
                  &Visualizer::CaptureDepthPointCloud,
                  "Function to capture and save local point cloud", "filename"_a,
                  "do_render"_a = false, "convert_to_world_coordinate"_a = false)
-            .def("get_window_name", &Visualizer::GetWindowName);
+            .def("get_window_name", &Visualizer::GetWindowName)
+            .def("get_view_status", &Visualizer::GetViewStatus,
+                 "Get the current view status as a json string of "
+                 "ViewTrajectory.")
+            .def("set_view_status", &Visualizer::SetViewStatus,
+                 "Set the current view status from a json string of "
+                 "ViewTrajectory.",
+                 "view_status_str"_a);
 
     py::class_<VisualizerWithKeyCallback,
                PyVisualizer<VisualizerWithKeyCallback>,
@@ -156,7 +164,9 @@ void pybind_visualizer(py::module &m) {
                             "Visualizer with editing capabilities.");
     py::detail::bind_default_constructor<VisualizerWithEditing>(
             visualizer_edit);
-    visualizer_edit.def(py::init<double, bool, const std::string &>())
+    visualizer_edit
+            .def(py::init<double, bool, const std::string &>(), "voxel_size"_a,
+                 "use_dialog"_a, "directory"_a)
             .def("__repr__",
                  [](const VisualizerWithEditing &vis) {
                      return std::string("VisualizerWithEditing with name ") +
@@ -185,7 +195,7 @@ void pybind_visualizer(py::module &m) {
                             vis.GetWindowName();
                  })
             .def("pick_points", &VisualizerWithVertexSelection::PickPoints,
-                 "Function to pick points")
+                 "Function to pick points", "x"_a, "y"_a, "w"_a, "h"_a)
             .def("get_picked_points",
                  &VisualizerWithVertexSelection::GetPickedPoints,
                  "Function to get picked points")
@@ -194,23 +204,26 @@ void pybind_visualizer(py::module &m) {
                  "Function to clear picked points")
             .def("add_picked_points",
                  &VisualizerWithVertexSelection::AddPickedPoints,
-                 "Function to add picked points")
+                 "Function to add picked points", "indices"_a)
             .def("remove_picked_points",
                  &VisualizerWithVertexSelection::RemovePickedPoints,
-                 "Function to remove picked points")
+                 "Function to remove picked points", "indices"_a)
             .def("register_selection_changed_callback",
                  &VisualizerWithVertexSelection::
                          RegisterSelectionChangedCallback,
-                 "Registers a function to be called when selection changes")
+                 "Registers a function to be called when selection changes",
+                 "f"_a)
             .def("register_selection_moving_callback",
                  &VisualizerWithVertexSelection::
                          RegisterSelectionMovingCallback,
                  "Registers a function to be called while selection moves. "
                  "Geometry's vertex values can be changed, but do not change"
-                 "the number of vertices.")
+                 "the number of vertices.",
+                 "f"_a)
             .def("register_selection_moved_callback",
                  &VisualizerWithVertexSelection::RegisterSelectionMovedCallback,
-                 "Registers a function to be called after selection moves");
+                 "Registers a function to be called after selection moves",
+                 "f"_a);
 
     py::class_<VisualizerWithVertexSelection::PickedPoint>
             visualizer_vselect_pickedpoint(m, "PickedPoint");

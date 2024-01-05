@@ -37,6 +37,8 @@ class Image;
 
 namespace visualization {
 
+class GLFWContext;
+
 /// \class Visualizer
 ///
 /// \brief The main Visualizer class.
@@ -132,6 +134,7 @@ public:
     /// Visualizer should be updated accordingly.
     ///
     /// \param geometry_ptr The Geometry object.
+    /// \param reset_bounding_box Reset viewpoint to view all geometries.
     virtual bool AddGeometry(
             std::shared_ptr<const geometry::Geometry> geometry_ptr,
             bool reset_bounding_box = true);
@@ -145,6 +148,7 @@ public:
     /// added by AddGeometry
     ///
     /// \param geometry_ptr The Geometry object.
+    /// \param reset_bounding_box Reset viewpoint to view all geometries.
     virtual bool RemoveGeometry(
             std::shared_ptr<const geometry::Geometry> geometry_ptr,
             bool reset_bounding_box = true);
@@ -214,10 +218,17 @@ public:
                                 bool do_render = true,
                                 bool convert_to_world_coordinate = false);
     void CaptureRenderOption(const std::string &filename = "");
+
     /// Function to reset view point.
     void ResetViewPoint(bool reset_bounding_box = false);
 
     const std::string &GetWindowName() const { return window_name_; }
+
+    /// Get the current view status as a json string of ViewTrajectory.
+    std::string GetViewStatus();
+
+    /// Set the current view status from a json string of ViewTrajectory.
+    void SetViewStatus(const std::string &view_status_str);
 
 protected:
     /// Function to initialize OpenGL
@@ -234,11 +245,13 @@ protected:
     /// meshes individually).
     virtual void Render(bool render_screen = false);
 
+    /// Copy the current view status to clipboard.
     void CopyViewStatusToClipboard();
 
+    /// Apply the view point from clipboard.
     void CopyViewStatusFromClipboard();
 
-    // callback functions
+    /// Callback functions
     virtual void WindowRefreshCallback(GLFWwindow *window);
     virtual void WindowResizeCallback(GLFWwindow *window, int w, int h);
     virtual void MouseMoveCallback(GLFWwindow *window, double x, double y);
@@ -258,6 +271,10 @@ protected:
     // window
     GLFWwindow *window_ = NULL;
     std::string window_name_ = "Open3D";
+
+    /// \brief Shared GLFW context.
+    std::shared_ptr<GLFWContext> glfw_context_ = nullptr;
+
     Eigen::Vector2i saved_window_size_ = Eigen::Vector2i::Zero();
     Eigen::Vector2i saved_window_pos_ = Eigen::Vector2i::Zero();
     std::function<bool(Visualizer *)> animation_callback_func_ = nullptr;
