@@ -24,18 +24,30 @@ make install-pip-package
 
 ## Public Package
 
-To build public package, refer to the command in `.github/workflows/ubuntu-wheel.yml`:
+To build public package, just run (currently support 38/39/310/311):
 ```bash
-docker/docker_build.sh cuda_wheel_py310_dev  # will add commit hash
+BUILD_TENSORFLOW_OPS=OFF BUILD_PYTORCH_OPS=OFF docker/docker_build.sh cuda_wheel_py310_dev  # will add commit hash
 ```
-The final artifact would be available at the current directory. Also a wheel named `open3d-ci` will be created for future usage.
+The final artifact would be available at the current directory.
 
-~~The CI/CD workflow will be automatically executed once pushed. I delete something from `.github/workflow` to make the display more concentrated.~~ (The GH CI/CD is completely disabled because it took too much space and my quota...)
+**Clean Package Content**
+
+I set the PyPI package name to `open3d_pycg` because this package will be very tightly used with `pycg`, and this removes collison with other versions of `open3d`. Still, there are many useless things in the packages (depencies, functions, ML, ...), hence I remove them via:
+
+```bash
+# Move all cpu packages
+mv open3d_pycg_cpu*.whl whl_packages/
+# Trim the package
+python whl_trimmer.py whl_packages/
+# Organize files
+mv whl_packages/open3d_pycg_cpu*.whl ./
+mv whl_packages/out/* ./
+rm -rf whl_packages/tmp/
+```
 
 **Making Package Available Online**
 
 ```bash
-mv open3d*.whl whl_packages/
 # Append record given current wheels.
 python whl_packages/create_index.py
 # Upload index.html
@@ -47,6 +59,8 @@ find whl_packages/ -name '*.whl' | while read file; do awsm cp $file s3://pycg/p
 ~~I tried to name my mod `open3d-pycg` in PyPI, but failed (PEP 440 doesn't allow git revision as version number + 100MB file upload limit). To make pip auto determine version, I set up my own PyPI using the tutorial from [here](https://testdriven.io/blog/private-pypi/).~~
 1. ~~Upload the artifact to `eagle` under `/root/pypi/packages`~~
 2. ~~Install via `pip install -U --index-url http://eagle.huangjh.tech:8080 --trusted-host eagle.huangjh.tech open3d`~~
+
+~~The CI/CD workflow will be automatically executed once pushed. I delete something from `.github/workflow` to make the display more concentrated.~~ (The GH CI/CD is completely disabled because it took too much space and my quota...)
 
 
 ## Modifications compared

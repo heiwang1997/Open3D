@@ -352,7 +352,7 @@ string(CONCAT PROJECT_VERSION_THREE_NUMBER "${OPEN3D_VERSION_MAJOR}"
 # - open3d-official
 # - open-3d
 if(NOT DEFINED PYPI_PACKAGE_NAME)
-    set(PYPI_PACKAGE_NAME "open3d")
+    set(PYPI_PACKAGE_NAME "open3d_pycg")
 endif()
 
 # Set installation paths

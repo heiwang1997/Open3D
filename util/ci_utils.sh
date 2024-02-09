@@ -141,16 +141,16 @@ build_pip_package() {
     options="$(echo "$@" | tr ' ' '|')"
 
     BUILD_FILAMENT_FROM_SOURCE=OFF
-    set +u
-    if [ -f "${OPEN3D_ML_ROOT}/set_open3d_ml_root.sh" ]; then
-        echo "Open3D-ML available at ${OPEN3D_ML_ROOT}. Bundling Open3D-ML in wheel."
+    # set +u
+    # if [ -f "${OPEN3D_ML_ROOT}/set_open3d_ml_root.sh" ]; then
+        # echo "Open3D-ML available at ${OPEN3D_ML_ROOT}. Bundling Open3D-ML in wheel."
         # the build system of the main repo expects a main branch. make sure main exists
-        git -C "${OPEN3D_ML_ROOT}" checkout -b main || true
-        BUNDLE_OPEN3D_ML=ON
-    else
-        echo "Open3D-ML not available."
-        BUNDLE_OPEN3D_ML=OFF
-    fi
+        # git -C "${OPEN3D_ML_ROOT}" checkout -b main || true
+        # BUNDLE_OPEN3D_ML=ON
+    # else
+        # echo "Open3D-ML not available."
+    BUNDLE_OPEN3D_ML=OFF
+    # fi
     if [[ "$DEVELOPER_BUILD" == "OFF" ]]; then
         echo "Building for a new Open3D release"
     fi

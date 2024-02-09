@@ -108,3 +108,5 @@ docs/getting_started.rst
 3rdparty/tinyobjloader/tinyobjloader/
 docs/docker.rst
 docs/tensorboard.md
+
+*ccache.tar.gz
