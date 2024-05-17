@@ -37,21 +37,28 @@ I set the PyPI package name to `open3d_pycg` because this package will be very t
 ```bash
 # Move all cpu packages
 mv open3d_pycg_cpu*.whl whl_packages/
+# Remove redundant packages
+rm -rf open3d_pycg-*.whl
 # Trim the package
 python whl_trimmer.py whl_packages/
 # Organize files
 mv whl_packages/open3d_pycg_cpu*.whl ./
-mv whl_packages/out/* ./
+mv whl_packages/out/* ./        # This will just overwrite the original files! Careful.
 rm -rf whl_packages/tmp/
 ```
 
 **Making Package Available Online**
 
 ```bash
+# Move wheels
+mv open3d_pycg_cpu*.whl whl_packages/
 # Append record given current wheels.
 python whl_packages/create_index.py
 # Upload index.html
 awsm cp whl_packages/index.html s3://pycg/packages/ $AWSGA
+
+# [Delete wheels you don't want to upload at whl_packages/]
+
 # Upload wheels
 find whl_packages/ -name '*.whl' | while read file; do awsm cp $file s3://pycg/packages/ $AWSGA; done
 ```
