@@ -5,7 +5,7 @@ I will work on my master branch, and merge with upstream using the following com
 ## Merging with upstream head
 
 1. Commit your changes.
-2. `git pull upstream master`
+2. `git pull upstream main`
 3. Commit the merge.
 4. (Optionally) `git push origin master`
 
