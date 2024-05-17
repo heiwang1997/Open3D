@@ -1201,9 +1201,6 @@ if(BUILD_GUI)
             implot_demo.cpp
             implot_items.cpp
             implot.cpp
-        DEPENDS
-            ext_implot
-            ext_imgui
     )
     # Add internal dependencies...
     target_include_directories(3rdparty_implot PRIVATE ${IMGUI_SOURCE_DIR})

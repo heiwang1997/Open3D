@@ -1,6 +1,6 @@
 include(ExternalProject)
 
-ExternalProject_Add(
+FetchContent_Declare(
     ext_implot
     PREFIX implot
     URL https://github.com/epezent/implot/archive/refs/tags/v0.14.tar.gz
@@ -12,5 +12,5 @@ ExternalProject_Add(
     INSTALL_COMMAND ""
 )
 
-ExternalProject_Get_Property(ext_implot SOURCE_DIR)
-set(IMPLOT_SOURCE_DIR ${SOURCE_DIR})
+FetchContent_Populate(ext_implot)
+FetchContent_GetProperties(ext_implot SOURCE_DIR IMPLOT_SOURCE_DIR)

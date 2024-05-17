@@ -88,3 +88,4 @@ find whl_packages/ -name '*.whl' | while read file; do awsm cp $file s3://pycg/p
 16. Enable backface culling binding (double-sided) in filament.
 17. Enable selecting model and edit its pose in the new viewer.
 18. Add `set_indirect_light_rotation` binding.
+19. Merge with upstream 0.18.0, change package name to `open3d_pycg`.
