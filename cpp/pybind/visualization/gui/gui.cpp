@@ -142,7 +142,7 @@ void InitializeForPython(std::string resource_path /*= ""*/,
         // is the path to
         // __init__.py), so we can use that to find the
         // resources included in the wheel.
-        py::object o3d = py::module::import("open3d");
+        py::object o3d = py::module::import("open3d_pycg");
         auto o3d_init_path = o3d.attr("__file__").cast<std::string>();
         auto module_path =
                 utility::filesystem::GetFileParentDirectory(o3d_init_path);
