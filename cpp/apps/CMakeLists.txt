@@ -14,11 +14,10 @@ macro(open3d_add_app_gui SRC_DIR APP_NAME TARGET_NAME)
         set(MACOSX_BUNDLE_NAME ${APP_NAME})
         set(MACOSX_BUNDLE_EXECUTABLE_NAME ${APP_NAME})
         set(MACOSX_BUNDLE_GUI_IDENTIFIER com.isl-org.open3d.${APP_NAME})
-        set(MACOSX_BUNDLE_ICON_FILE "AppIcon")
         set(MACOSX_BUNDLE_LONG_VERSION_STRING ${PROJECT_VERSION_THREE_NUMBER})
         set(MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_THREE_NUMBER})
         set(MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION_THREE_NUMBER})
-        set(MACOSX_BUNDLE_COPYRIGHT "Copyright (c) 2018-2023 www.open3d.org")
+        set(MACOSX_BUNDLE_COPYRIGHT "Copyright (c) 2018-2025 www.open3d.org")
     endif()
 
     # Copy the resource files. This needs to be done as a post-build step
@@ -55,9 +54,9 @@ macro(open3d_add_app_gui SRC_DIR APP_NAME TARGET_NAME)
                     DESTINATION "${CMAKE_INSTALL_PREFIX}/bin"
                     USE_SOURCE_PERMISSIONS)
             if (CMAKE_INSTALL_PREFIX MATCHES "^(/usr/local|/opt)")
-                set(DESKTOP_INSTALL_DIR "/usr/share")
+                set(DESKTOP_INSTALL_DIR "/usr/share" CACHE PATH "The install directory for the desktop apps")
             else()
-                set(DESKTOP_INSTALL_DIR "$ENV{HOME}/.local/share")
+                set(DESKTOP_INSTALL_DIR "$ENV{HOME}/.local/share" CACHE PATH "The install directory for the desktop apps")
             endif()
             configure_file("${SOURCE_DIR}/${TARGET_NAME}.desktop.in"
                            "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${APP_NAME}.desktop")
@@ -116,7 +115,7 @@ macro(open3d_add_app_common SRC_DIR APP_NAME TARGET_NAME)
                               MACOSX_BUNDLE_INFO_PLIST "${INFO_PLIST}"
                               XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "" # disable
                               OUTPUT_NAME ${APP_NAME}
-                             )
+                              INSTALL_RPATH "@loader_path;@loader_path/../lib/")
     elseif (WIN32)
         set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/../${APP_NAME}")
         add_executable(${TARGET_NAME} ${SOURCE_FILES} ${HEADER_FILES})
@@ -125,11 +124,16 @@ macro(open3d_add_app_common SRC_DIR APP_NAME TARGET_NAME)
         add_executable(${TARGET_NAME} ${SOURCE_FILES} ${HEADER_FILES})
         set_target_properties(${TARGET_NAME} PROPERTIES
                             OUTPUT_NAME ${APP_NAME}
-                            )
+                            INSTALL_RPATH "$ORIGIN;$ORIGIN/../lib/")
     endif()
 
-    target_link_libraries(${TARGET_NAME} PRIVATE Open3D::Open3D ${ARGN})
+    target_link_libraries(${TARGET_NAME} PRIVATE Open3D::Open3D TBB::tbb ${ARGN})
     set_target_properties(${TARGET_NAME} PROPERTIES FOLDER "apps")
+
+    if (BUILD_SYCL_MODULE)
+        find_package(IntelSYCL REQUIRED)   # requires cmake>=3.25 on Windows
+        add_sycl_to_target(TARGET ${TARGET_NAME})
+    endif()
 
     open3d_link_3rdparty_libraries(${TARGET_NAME})
     open3d_show_and_abort_on_warning(${TARGET_NAME})

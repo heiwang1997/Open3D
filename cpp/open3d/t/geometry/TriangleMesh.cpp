@@ -1,12 +1,14 @@
 // ----------------------------------------------------------------------------
 // -                        Open3D: www.open3d.org                            -
 // ----------------------------------------------------------------------------
-// Copyright (c) 2018-2023 www.open3d.org
+// Copyright (c) 2018-2024 www.open3d.org
 // SPDX-License-Identifier: MIT
 // ----------------------------------------------------------------------------
 
 #include "open3d/t/geometry/TriangleMesh.h"
 
+#include <fmt/core.h>
+#include <tbb/parallel_for_each.h>
 #include <vtkBooleanOperationPolyDataFilter.h>
 #include <vtkCleanPolyData.h>
 #include <vtkClipPolyData.h>
@@ -16,23 +18,42 @@
 #include <vtkQuadricDecimation.h>
 
 #include <Eigen/Core>
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <memory>
+#include <mutex>
 #include <string>
+#include <tuple>
 #include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 #include "open3d/core/CUDAUtils.h"
+#include "open3d/core/Device.h"
+#include "open3d/core/Dtype.h"
 #include "open3d/core/EigenConverter.h"
+#include "open3d/core/ParallelFor.h"
 #include "open3d/core/ShapeUtil.h"
 #include "open3d/core/Tensor.h"
 #include "open3d/core/TensorCheck.h"
+#include "open3d/core/TensorKey.h"
+#include "open3d/core/linalg/AddMM.h"
+#include "open3d/core/linalg/Matmul.h"
+#include "open3d/core/nns/NearestNeighborSearch.h"
 #include "open3d/t/geometry/LineSet.h"
 #include "open3d/t/geometry/PointCloud.h"
 #include "open3d/t/geometry/RaycastingScene.h"
 #include "open3d/t/geometry/VtkUtils.h"
+#include "open3d/t/geometry/kernel/IPPImage.h"
+#include "open3d/t/geometry/kernel/Metrics.h"
 #include "open3d/t/geometry/kernel/PCAPartition.h"
 #include "open3d/t/geometry/kernel/PointCloud.h"
 #include "open3d/t/geometry/kernel/Transform.h"
 #include "open3d/t/geometry/kernel/TriangleMesh.h"
 #include "open3d/t/geometry/kernel/UVUnwrapping.h"
+#include "open3d/t/io/ImageIO.h"
+#include "open3d/t/io/NumpyIO.h"
 #include "open3d/utility/ParallelScan.h"
 
 namespace open3d {
@@ -283,6 +304,51 @@ TriangleMesh &TriangleMesh::ComputeVertexNormals(bool normalized) {
     return *this;
 }
 
+static core::Tensor ComputeTriangleAreasHelper(const TriangleMesh &mesh) {
+    const int64_t triangle_num = mesh.GetTriangleIndices().GetLength();
+    const core::Dtype dtype = mesh.GetVertexPositions().GetDtype();
+    core::Tensor triangle_areas({triangle_num}, dtype, mesh.GetDevice());
+    if (mesh.IsCPU()) {
+        kernel::trianglemesh::ComputeTriangleAreasCPU(
+                mesh.GetVertexPositions().Contiguous(),
+                mesh.GetTriangleIndices().Contiguous(), triangle_areas);
+    } else if (mesh.IsCUDA()) {
+        CUDA_CALL(kernel::trianglemesh::ComputeTriangleAreasCUDA,
+                  mesh.GetVertexPositions().Contiguous(),
+                  mesh.GetTriangleIndices().Contiguous(), triangle_areas);
+    } else {
+        utility::LogError("Unimplemented device");
+    }
+
+    return triangle_areas;
+}
+
+TriangleMesh &TriangleMesh::ComputeTriangleAreas() {
+    if (IsEmpty()) {
+        utility::LogWarning("TriangleMesh is empty.");
+        return *this;
+    }
+
+    if (!HasTriangleIndices()) {
+        SetTriangleAttr("areas", core::Tensor::Empty(
+                                         {0}, GetVertexPositions().GetDtype(),
+                                         GetDevice()));
+        utility::LogWarning("TriangleMesh has no triangle indices.");
+        return *this;
+    }
+    if (HasTriangleAttr("areas")) {
+        utility::LogWarning(
+                "TriangleMesh already has triangle areas: remove "
+                "'areas' triangle attribute if you'd like to update.");
+        return *this;
+    }
+
+    core::Tensor triangle_areas = ComputeTriangleAreasHelper(*this);
+    SetTriangleAttr("areas", triangle_areas);
+
+    return *this;
+}
+
 double TriangleMesh::GetSurfaceArea() const {
     double surface_area = 0;
     if (IsEmpty()) {
@@ -295,22 +361,7 @@ double TriangleMesh::GetSurfaceArea() const {
         return surface_area;
     }
 
-    const int64_t triangle_num = GetTriangleIndices().GetLength();
-    const core::Dtype dtype = GetVertexPositions().GetDtype();
-    core::Tensor triangle_areas({triangle_num}, dtype, GetDevice());
-
-    if (IsCPU()) {
-        kernel::trianglemesh::ComputeTriangleAreasCPU(
-                GetVertexPositions().Contiguous(),
-                GetTriangleIndices().Contiguous(), triangle_areas);
-    } else if (IsCUDA()) {
-        CUDA_CALL(kernel::trianglemesh::ComputeTriangleAreasCUDA,
-                  GetVertexPositions().Contiguous(),
-                  GetTriangleIndices().Contiguous(), triangle_areas);
-    } else {
-        utility::LogError("Unimplemented device");
-    }
-
+    core::Tensor triangle_areas = ComputeTriangleAreasHelper(*this);
     surface_area = triangle_areas.Sum({0}).To(core::Float64).Item<double>();
 
     return surface_area;
@@ -989,7 +1040,7 @@ TriangleMesh::BakeTriangleAttrTextures(
         }
         core::Tensor tensor =
                 triangle_attr_.at(attr).To(core::Device()).Contiguous();
-        DISPATCH_DTYPE_TO_TEMPLATE(tensor.GetDtype(), [&]() {
+        DISPATCH_DTYPE_TO_TEMPLATE_WITH_BOOL(tensor.GetDtype(), [&]() {
             core::Tensor tex;
             if (GetTriangleIndices().GetDtype() == core::Int32) {
                 tex = BakeAttribute<scalar_t, int32_t, false>(
@@ -1166,7 +1217,8 @@ static bool IsNegative(T val) {
     return false;
 }
 
-TriangleMesh TriangleMesh::SelectByIndex(const core::Tensor &indices) const {
+TriangleMesh TriangleMesh::SelectByIndex(const core::Tensor &indices,
+                                         bool copy_attributes /*=true*/) const {
     core::AssertTensorShape(indices, {indices.GetLength()});
     if (indices.NumElements() == 0) {
         return {};
@@ -1266,7 +1318,8 @@ TriangleMesh TriangleMesh::SelectByIndex(const core::Tensor &indices) const {
     if (tris_cpu.NumElements() > 0) {  // To() needs non-empty tensor
         result.SetTriangleIndices(tris_cpu.To(GetDevice()));
     }
-    CopyAttributesByMasks(result, *this, vertex_mask, tri_mask);
+    if (copy_attributes)
+        CopyAttributesByMasks(result, *this, vertex_mask, tri_mask);
 
     return result;
 }
@@ -1321,9 +1374,520 @@ TriangleMesh TriangleMesh::RemoveUnreferencedVertices() {
 
     utility::LogDebug(
             "[RemoveUnreferencedVertices] {:d} vertices have been removed.",
-            (int)(num_verts_old - GetVertexPositions().GetLength()));
+            static_cast<int>(num_verts_old - GetVertexPositions().GetLength()));
 
     return *this;
+}
+
+namespace {
+
+core::Tensor Project(const core::Tensor &t_xyz,  // contiguous {...,3}
+                     const core::Tensor &t_intrinsic_matrix,  // {3,3}
+                     const core::Tensor &t_extrinsic_matrix,  // {4,4}
+                     core::Tensor &t_xy) {  // contiguous {...,2}
+    auto xy_shape = t_xyz.GetShape();
+    auto dt = t_xyz.GetDtype();
+    auto t_K = t_intrinsic_matrix.To(dt).Contiguous(),
+         t_T = t_extrinsic_matrix.To(dt).Contiguous();
+    xy_shape[t_xyz.NumDims() - 1] = 2;
+    if (t_xy.GetDtype() != dt || t_xy.GetShape() != xy_shape) {
+        t_xy = core::Tensor(xy_shape, dt);
+    }
+    DISPATCH_FLOAT_DTYPE_TO_TEMPLATE(dt, [&]() {
+        // Eigen is column major
+        Eigen::Map<Eigen::MatrixX<scalar_t>> xy(t_xy.GetDataPtr<scalar_t>(), 2,
+                                                t_xy.NumElements() / 2);
+        Eigen::Map<const Eigen::MatrixX<scalar_t>> xyz(
+                t_xyz.GetDataPtr<scalar_t>(), 3, t_xyz.NumElements() / 3);
+        Eigen::Map<const Eigen::Matrix3<scalar_t>> KT(
+                t_K.GetDataPtr<scalar_t>());
+        Eigen::Map<const Eigen::Matrix4<scalar_t>> TT(
+                t_T.GetDataPtr<scalar_t>());
+
+        auto K = KT.transpose();
+        auto T = TT.transpose();
+        auto R = T.topLeftCorner<3, 3>();
+        auto t = T.topRightCorner<3, 1>();
+        auto pxyz = (K * ((R * xyz).colwise() + t)).array();
+        xy = pxyz.topRows<2>().rowwise() / pxyz.bottomRows<1>();
+    });
+    return t_xy;  // contiguous {...,2}
+}
+
+/// Estimate minimum sqr distance from a set of points to a set of cameras.
+float get_min_cam_sqrdistance(
+        const core::Tensor &positions,
+        const std::vector<core::Tensor> &extrinsic_matrices) {
+    const size_t MAXPTS = 10000;
+    core::Tensor cam_loc({int64_t(extrinsic_matrices.size()), 3},
+                         core::Float32);
+    for (size_t k = 0; k < extrinsic_matrices.size(); ++k) {
+        const core::Tensor RT = extrinsic_matrices[k].Slice(0, 0, 3);
+        cam_loc[k] =
+                -RT.Slice(1, 0, 3).T().Matmul(RT.Slice(1, 3, 4)).Reshape({-1});
+    }
+    size_t npts = positions.GetShape(0);
+    const core::Tensor pos_sample =
+            npts > MAXPTS ? positions.Slice(0, 0, -1, npts / MAXPTS)
+                          : positions;
+    auto nns = core::nns::NearestNeighborSearch(pos_sample);
+    nns.KnnIndex();
+    float min_sqrdistance = nns.KnnSearch(cam_loc, 1)
+                                    .second.Min({0, 1})
+                                    .To(core::Device(), core::Float32)
+                                    .Item<float>();
+    return min_sqrdistance;
+}
+
+}  // namespace
+
+Image TriangleMesh::ProjectImagesToAlbedo(
+        const std::vector<Image> &images,
+        const std::vector<core::Tensor> &intrinsic_matrices,
+        const std::vector<core::Tensor> &extrinsic_matrices,
+        int tex_size /*=1024*/,
+        bool update_material /*=true*/) {
+    if (!GetDevice().IsCPU() || !Image::HAVE_IPP) {
+        utility::LogError(
+                "ProjectImagesToAlbedo is only supported on x86_64 CPU "
+                "devices.");
+    }
+    using core::None;
+    using tk = core::TensorKey;
+    constexpr float EPS = 1e-6;
+    if (!HasTriangleAttr("texture_uvs")) {
+        utility::LogError(
+                "TriangleMesh does not contain 'texture_uvs'. Please compute "
+                "it with ComputeUVAtlas() first.");
+    }
+    core::Tensor texture_uvs =
+            GetTriangleAttr("texture_uvs").To(core::Device()).Contiguous();
+    core::AssertTensorShape(texture_uvs, {core::None, 3, 2});
+    core::AssertTensorDtype(texture_uvs, {core::Float32});
+
+    if (images.size() != extrinsic_matrices.size() ||
+        images.size() != intrinsic_matrices.size()) {
+        utility::LogError(
+                "Received {} images, but {} extrinsic matrices and {} "
+                "intrinsic matrices.",
+                images.size(), extrinsic_matrices.size(),
+                intrinsic_matrices.size());
+    }
+
+    // softmax_shift is used to prevent overflow in the softmax function.
+    // softmax_shift is set so that max value of weighting function is exp(64),
+    // well within float range. (exp(89.f) is inf)
+    float min_sqr_distance =
+            get_min_cam_sqrdistance(GetVertexPositions(), extrinsic_matrices);
+    float softmax_shift = 10.f, softmax_scale = 20 * min_sqr_distance;
+    // (u,v) -> (x,y,z) : {tex_size, tex_size, 3}
+    core::Tensor position_map = BakeVertexAttrTextures(
+            tex_size, {"positions"}, 1, 0, false)["positions"];
+    core::Tensor albedo =
+            core::Tensor::Zeros({tex_size, tex_size, 4}, core::Float32);
+    albedo.Slice(2, 3, 4).Fill(EPS);  // regularize weight
+    std::mutex albedo_mutex;
+
+    RaycastingScene rcs;
+    rcs.AddTriangles(*this);
+
+    // setup working data for each task.
+    size_t max_workers = tbb::this_task_arena::max_concurrency();
+    // Tensor copy ctor does shallow copies - OK for empty tensors.
+    std::vector<core::Tensor> this_albedo(max_workers,
+                                          core::Tensor({}, core::Float32)),
+            weighted_image(max_workers, core::Tensor({}, core::Float32)),
+            uv2xy(max_workers, core::Tensor({}, core::Float32)),
+            uvrays(max_workers, core::Tensor({}, core::Float32));
+
+    auto project_one_image = [&](size_t i, tbb::feeder<size_t> &feeder) {
+        size_t widx = tbb::this_task_arena::current_thread_index();
+        // initialize task variables
+        if (!this_albedo[widx].GetShape().IsCompatible(
+                    {tex_size, tex_size, 4})) {
+            this_albedo[widx] =
+                    core::Tensor::Empty({tex_size, tex_size, 4}, core::Float32);
+            uvrays[widx] =
+                    core::Tensor::Empty({tex_size, tex_size, 6}, core::Float32);
+        }
+        auto width = images[i].GetCols(), height = images[i].GetRows();
+        if (!weighted_image[widx].GetShape().IsCompatible({height, width, 4})) {
+            weighted_image[widx] =
+                    core::Tensor({height, width, 4}, core::Float32);
+        }
+        core::AssertTensorShape(intrinsic_matrices[i], {3, 3});
+        core::AssertTensorShape(extrinsic_matrices[i], {4, 4});
+
+        // A. Get image space weight matrix, as inverse of pixel
+        // footprint on the mesh.
+        auto rays = RaycastingScene::CreateRaysPinhole(
+                intrinsic_matrices[i], extrinsic_matrices[i], width, height);
+        core::Tensor cam_loc =
+                rays.GetItem({tk::Index(0), tk::Index(0), tk::Slice(0, 3, 1)});
+
+        // A nested parallel_for's threads must be isolated from the threads
+        // running this paralel_for, else we get BAD ACCESS errors.
+        auto result = tbb::this_task_arena::isolate(
+                [&rays, &rcs]() { return rcs.CastRays(rays); });
+        // Eigen is column-major order
+        Eigen::Map<Eigen::ArrayXXf> normals_e(
+                result["primitive_normals"].GetDataPtr<float>(), 3,
+                width * height);
+        Eigen::Map<Eigen::ArrayXXf> rays_e(rays.GetDataPtr<float>(), 6,
+                                           width * height);
+        Eigen::Map<Eigen::ArrayXXf> t_hit(result["t_hit"].GetDataPtr<float>(),
+                                          1, width * height);
+        auto depth = t_hit * rays_e.bottomRows<3>().colwise().norm().array();
+        // removing this eval() increase runtime a lot (?)
+        auto rays_dir = rays_e.bottomRows<3>().colwise().normalized().eval();
+        auto pixel_foreshortening = (normals_e * rays_dir)
+                                            .colwise()
+                                            .sum()
+                                            .abs();  // ignore face orientation
+        // fix for bad normals
+        auto inv_footprint =
+                pixel_foreshortening.isNaN().select(0, pixel_foreshortening) /
+                (depth * depth);
+        utility::LogDebug(
+                "[ProjectImagesToAlbedo] Image {}, weight (inv_footprint) "
+                "range: {}-{}",
+                i, inv_footprint.minCoeff(), inv_footprint.maxCoeff());
+        weighted_image[widx].Slice(2, 0, 3) =
+                images[i].To(core::Float32).AsTensor();  // range: [0,1]
+        Eigen::Map<Eigen::MatrixXf> weighted_image_e(
+                weighted_image[widx].GetDataPtr<float>(), 4, width * height);
+        weighted_image_e.bottomRows<1>() = inv_footprint;
+
+        // B. Get texture space (u,v) -> (x,y) map and valid domain in
+        // uv space.
+        uvrays[widx].GetItem({tk::Slice(0, None, 1), tk::Slice(0, None, 1),
+                              tk::Slice(0, 3, 1)}) = cam_loc;
+        uvrays[widx].GetItem({tk::Slice(0, None, 1), tk::Slice(0, None, 1),
+                              tk::Slice(3, 6, 1)}) = position_map - cam_loc;
+        // A nested parallel_for's threads must be isolated from the threads
+        // running this paralel_for, else we get BAD ACCESS errors.
+        result = tbb::this_task_arena::isolate(
+                [&rcs, &uvrays, widx]() { return rcs.CastRays(uvrays[widx]); });
+        auto &t_hit_uv = result["t_hit"];
+
+        Project(position_map, intrinsic_matrices[i], extrinsic_matrices[i],
+                uv2xy[widx]);  // {ts, ts, 2}
+        // Disable self-occluded points
+        for (float *p_uv2xy = uv2xy[widx].GetDataPtr<float>(),
+                   *p_t_hit = t_hit_uv.GetDataPtr<float>();
+             p_uv2xy <
+             uv2xy[widx].GetDataPtr<float>() + uv2xy[widx].NumElements();
+             p_uv2xy += 2, ++p_t_hit) {
+            if (*p_t_hit < 1 - EPS) *p_uv2xy = *(p_uv2xy + 1) = -1.f;
+        }
+        core::Tensor uv2xy2 =
+                uv2xy[widx].Permute({2, 0, 1}).Contiguous();  // {2, ts, ts}
+
+        // C. Interpolate weighted image to weighted texture
+        // albedo[u,v] = image[ i[u,v], j[u,v] ]
+        this_albedo[widx].Fill(0.f);
+        IPP_CALL(ipp::Remap, weighted_image[widx], /*{height, width, 4} f32*/
+                 uv2xy2[0],                        /* {texsz, texsz} f32*/
+                 uv2xy2[1],                        /* {texsz, texsz} f32*/
+                 this_albedo[widx],                /*{texsz, texsz, 4} f32*/
+                 t::geometry::Image::InterpType::Linear);
+        // Weights can become negative with higher order interpolation
+
+        std::unique_lock<std::mutex> albedo_lock{albedo_mutex};
+        // ^^^ released when lambda returns.
+        for (auto p_albedo = albedo.GetDataPtr<float>(),
+                  p_this_albedo = this_albedo[widx].GetDataPtr<float>();
+             p_albedo < albedo.GetDataPtr<float>() + albedo.NumElements();
+             p_albedo += 4, p_this_albedo += 4) {
+            float softmax_weight =
+                    exp(softmax_scale * p_this_albedo[3] - softmax_shift);
+            for (auto k = 0; k < 3; ++k)
+                p_albedo[k] += p_this_albedo[k] * softmax_weight;
+            p_albedo[3] += softmax_weight;
+        }
+    };
+
+    std::vector<size_t> range(images.size(), 0);
+    std::iota(range.begin(), range.end(), 0);
+    tbb::parallel_for_each(range, project_one_image);
+    albedo.Slice(2, 0, 3) /= albedo.Slice(2, 3, 4);
+
+    // Image::To uses saturate_cast
+    Image albedo_texture =
+            Image(albedo.Slice(2, 0, 3).Contiguous())
+                    .To(core::UInt8, /*copy=*/true, /*scale=*/255.f);
+    if (update_material) {
+        if (!HasMaterial()) {
+            SetMaterial(visualization::rendering::Material());
+            GetMaterial().SetDefaultProperties();  // defaultUnlit
+        }
+        GetMaterial().SetAlbedoMap(albedo_texture);
+    }
+    return albedo_texture;
+}
+
+namespace {
+template <typename T,
+          typename std::enable_if<std::is_integral<T>::value &&
+                                          !std::is_same<T, bool>::value,
+                                  T>::type * = nullptr>
+using Edge = std::tuple<T, T>;
+}
+
+/// brief Helper function to get an edge with ordered vertex indices.
+template <typename T>
+static inline Edge<T> GetOrderedEdge(T vidx0, T vidx1) {
+    return (vidx0 < vidx1) ? Edge<T>{vidx0, vidx1} : Edge<T>{vidx1, vidx0};
+}
+
+/// brief Helper
+///
+template <typename T>
+static std::unordered_map<Edge<T>,
+                          std::vector<size_t>,
+                          utility::hash_tuple<Edge<T>>>
+GetEdgeToTrianglesMap(const core::Tensor &tris_cpu) {
+    std::unordered_map<Edge<T>, std::vector<size_t>,
+                       utility::hash_tuple<Edge<T>>>
+            tris_per_edge;
+    auto AddEdge = [&](T vidx0, T vidx1, int64_t tidx) {
+        tris_per_edge[GetOrderedEdge(vidx0, vidx1)].push_back(tidx);
+    };
+    const T *tris_ptr = tris_cpu.GetDataPtr<T>();
+    for (int64_t tidx = 0; tidx < tris_cpu.GetLength(); ++tidx) {
+        const T *triangle = &tris_ptr[3 * tidx];
+        AddEdge(triangle[0], triangle[1], tidx);
+        AddEdge(triangle[1], triangle[2], tidx);
+        AddEdge(triangle[2], triangle[0], tidx);
+    }
+    return tris_per_edge;
+}
+
+TriangleMesh TriangleMesh::RemoveNonManifoldEdges() {
+    if (!HasVertexPositions() || GetVertexPositions().GetLength() == 0) {
+        utility::LogWarning(
+                "[RemoveNonManifildEdges] TriangleMesh has no vertices.");
+        return *this;
+    }
+
+    if (!HasTriangleIndices() || GetTriangleIndices().GetLength() == 0) {
+        utility::LogWarning(
+                "[RemoveNonManifoldEdges] TriangleMesh has no triangles.");
+        return *this;
+    }
+
+    GetVertexAttr().AssertSizeSynchronized();
+    GetTriangleAttr().AssertSizeSynchronized();
+
+    core::Tensor tris_cpu =
+            GetTriangleIndices().To(core::Device()).Contiguous();
+
+    if (!HasTriangleAttr("areas")) {
+        ComputeTriangleAreas();
+    }
+    core::Tensor tri_areas_cpu =
+            GetTriangleAttr("areas").To(core::Device()).Contiguous();
+
+    DISPATCH_FLOAT_INT_DTYPE_TO_TEMPLATE(
+            GetVertexPositions().GetDtype(), tris_cpu.GetDtype(), [&]() {
+                scalar_t *tri_areas_ptr = tri_areas_cpu.GetDataPtr<scalar_t>();
+                auto edges_to_tris = GetEdgeToTrianglesMap<int_t>(tris_cpu);
+
+                // lambda to compare triangles areas by index
+                auto area_greater_compare = [&tri_areas_ptr](size_t lhs,
+                                                             size_t rhs) {
+                    return tri_areas_ptr[lhs] > tri_areas_ptr[rhs];
+                };
+
+                // go through all edges and for those that have more than 2
+                // triangles attached, remove the triangles with the minimal
+                // area
+                for (auto &kv : edges_to_tris) {
+                    // remove all triangles which are already marked for removal
+                    // (area < 0) note, the erasing of triangles happens
+                    // afterwards
+                    auto tris_end = std::remove_if(
+                            kv.second.begin(), kv.second.end(),
+                            [=](size_t t) { return tri_areas_ptr[t] < 0; });
+                    // count non-removed triangles (with area > 0).
+                    int n_tris = std::distance(kv.second.begin(), tris_end);
+
+                    if (n_tris <= 2) {
+                        // nothing to do here as either:
+                        // - all triangles of the edge are already marked for
+                        // deletion
+                        // - the edge is manifold: it has 1 or 2 triangles with
+                        //   a non-negative area
+                        continue;
+                    }
+
+                    // now erase all triangle indices already marked for removal
+                    kv.second.erase(tris_end, kv.second.end());
+
+                    // find first to triangles with the maximal area
+                    std::nth_element(kv.second.begin(), kv.second.begin() + 1,
+                                     kv.second.end(), area_greater_compare);
+
+                    // mark others for deletion
+                    for (auto it = kv.second.begin() + 2; it < kv.second.end();
+                         ++it) {
+                        tri_areas_ptr[*it] = -1;
+                    }
+                }
+            });
+
+    // mask for triangles with positive area
+    core::Tensor tri_mask = tri_areas_cpu.Gt(0.0).To(GetDevice());
+
+    // pick up positive-area triangles (and their attributes)
+    for (auto item : GetTriangleAttr()) {
+        SetTriangleAttr(item.first, item.second.IndexGet({tri_mask}));
+    }
+
+    return *this;
+}
+
+core::Tensor TriangleMesh::GetNonManifoldEdges(
+        bool allow_boundary_edges /* = true */) const {
+    if (!HasVertexPositions()) {
+        utility::LogWarning(
+                "[GetNonManifoldEdges] TriangleMesh has no vertices.");
+        return {};
+    }
+
+    if (!HasTriangleIndices()) {
+        utility::LogWarning(
+                "[GetNonManifoldEdges] TriangleMesh has no triangles.");
+        return {};
+    }
+
+    core::Tensor result;
+    core::Tensor tris_cpu =
+            GetTriangleIndices().To(core::Device()).Contiguous();
+    core::Dtype tri_dtype = tris_cpu.GetDtype();
+
+    DISPATCH_INT_DTYPE_PREFIX_TO_TEMPLATE(tri_dtype, tris, [&]() {
+        auto edges = GetEdgeToTrianglesMap<scalar_tris_t>(tris_cpu);
+        std::vector<scalar_tris_t> non_manifold_edges;
+
+        for (auto &kv : edges) {
+            if ((allow_boundary_edges &&
+                 (kv.second.size() < 1 || kv.second.size() > 2)) ||
+                (!allow_boundary_edges && kv.second.size() != 2)) {
+                non_manifold_edges.push_back(std::get<0>(kv.first));
+                non_manifold_edges.push_back(std::get<1>(kv.first));
+            }
+        }
+
+        result = core::Tensor(non_manifold_edges,
+                              {(long int)non_manifold_edges.size() / 2, 2},
+                              tri_dtype, GetTriangleIndices().GetDevice());
+    });
+
+    return result;
+}
+
+PointCloud TriangleMesh::SamplePointsUniformly(
+        size_t number_of_points, bool use_triangle_normal /*=false*/) {
+    if (number_of_points <= 0) {
+        utility::LogError("number_of_points <= 0");
+    }
+    if (IsEmpty()) {
+        utility::LogError("Input mesh is empty. Cannot sample points.");
+    }
+    if (!HasTriangleIndices()) {
+        utility::LogError("Input mesh has no triangles. Cannot sample points.");
+    }
+    if (use_triangle_normal && !HasTriangleNormals()) {
+        ComputeTriangleNormals(true);
+    }
+    if (!HasTriangleAttr("areas")) {
+        ComputeTriangleAreas();  // Compute area of each triangle
+    }
+    if (!IsCPU()) {
+        utility::LogWarning(
+                "SamplePointsUniformly is implemented only on CPU. Computing "
+                "on CPU.");
+    }
+    bool use_vert_normals = HasVertexNormals() && !use_triangle_normal;
+    bool use_albedo =
+            HasTriangleAttr("texture_uvs") && GetMaterial().HasAlbedoMap();
+    bool use_vert_colors = HasVertexColors() && !use_albedo;
+
+    auto cpu = core::Device();
+    core::Tensor null_tensor({0}, core::Float32);  // zero size tensor
+    auto triangles = GetTriangleIndices().To(cpu).Contiguous(),
+         vertices = GetVertexPositions().To(cpu).Contiguous();
+    auto float_dt = vertices.GetDtype();
+    auto areas = GetTriangleAttr("areas").To(cpu, float_dt).Contiguous(),
+         vertex_normals =
+                 use_vert_normals
+                         ? GetVertexNormals().To(cpu, float_dt).Contiguous()
+                         : null_tensor,
+         triangle_normals =
+                 use_triangle_normal
+                         ? GetTriangleNormals().To(cpu, float_dt).Contiguous()
+                         : null_tensor,
+         vertex_colors =
+                 use_vert_colors
+                         ? GetVertexColors().To(cpu, core::Float32).Contiguous()
+                         : null_tensor,
+         texture_uvs = use_albedo ? GetTriangleAttr("texture_uvs")
+                                            .To(cpu, float_dt)
+                                            .Contiguous()
+                                  : null_tensor,
+         // With correct range conversion [0,255] -> [0,1]
+            albedo = use_albedo ? GetMaterial()
+                                          .GetAlbedoMap()
+                                          .To(core::Float32)
+                                          .To(cpu)
+                                          .AsTensor()
+                                : null_tensor;
+    if (use_vert_colors) {
+        if (GetVertexColors().GetDtype() == core::UInt8) vertex_colors /= 255;
+        if (GetVertexColors().GetDtype() == core::UInt16)
+            vertex_colors /= 65535;
+    }
+
+    std::array<core::Tensor, 3> result =
+            kernel::trianglemesh::SamplePointsUniformlyCPU(
+                    triangles, vertices, areas, vertex_normals, vertex_colors,
+                    triangle_normals, texture_uvs, albedo, number_of_points);
+
+    PointCloud pcd(result[0]);
+    if (use_vert_normals || use_triangle_normal) pcd.SetPointNormals(result[1]);
+    if (use_albedo || use_vert_colors) pcd.SetPointColors(result[2]);
+    return pcd.To(GetDevice());
+}
+
+core::Tensor TriangleMesh::ComputeMetrics(const TriangleMesh &mesh2,
+                                          std::vector<Metric> metrics,
+                                          MetricParameters params) const {
+    if (IsEmpty() || mesh2.IsEmpty()) {
+        utility::LogError("One or both input triangle meshes are empty!");
+    }
+    if (!IsCPU() || !mesh2.IsCPU()) {
+        utility::LogWarning(
+                "ComputeDistance is implemented only on CPU. Computing on "
+                "CPU.");
+    }
+    auto cpu_mesh1 = To(core::Device("CPU:0")),
+         cpu_mesh2 = mesh2.To(core::Device("CPU:0"));
+    core::Tensor points1 =
+            cpu_mesh1.SamplePointsUniformly(params.n_sampled_points)
+                    .GetPointPositions();
+    core::Tensor points2 =
+            cpu_mesh2.SamplePointsUniformly(params.n_sampled_points)
+                    .GetPointPositions();
+
+    RaycastingScene scene1, scene2;
+    scene1.AddTriangles(cpu_mesh1);
+    scene2.AddTriangles(cpu_mesh2);
+
+    core::Tensor distance21 = scene1.ComputeDistance(points2);
+    core::Tensor distance12 = scene2.ComputeDistance(points1);
+
+    return ComputeMetricsCommon(distance12, distance21, metrics, params);
 }
 
 }  // namespace geometry

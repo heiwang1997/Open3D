@@ -62,7 +62,7 @@ function(open3d_print_configuration_summary)
         googletest
         imgui
         implot
-        ippicv
+        ipp
         JPEG
         jsoncpp
         liblzf

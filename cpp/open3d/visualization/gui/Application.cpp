@@ -1,7 +1,7 @@
 // ----------------------------------------------------------------------------
 // -                        Open3D: www.open3d.org                            -
 // ----------------------------------------------------------------------------
-// Copyright (c) 2018-2023 www.open3d.org
+// Copyright (c) 2018-2024 www.open3d.org
 // SPDX-License-Identifier: MIT
 // ----------------------------------------------------------------------------
 
@@ -89,6 +89,8 @@ std::string FindResourcePath(int argc, const char *argv[]) {
     for (auto &subpath :
          {"/resources", "/../resources" /*building with Xcode */,
           "/share/resources" /* GNU */, "/share/Open3D/resources" /* GNU */}) {
+        open3d::utility::LogInfo("Checking for resources in {}",
+                                 path + subpath);
         if (o3dfs::DirectoryExists(path + subpath)) {
             return path + subpath;
         }

@@ -21,21 +21,17 @@ fi
 BUILD_TENSORFLOW_OPS=${BUILD_TENSORFLOW_OPS:-ON}
 BUILD_PYTORCH_OPS=${BUILD_PYTORCH_OPS:-ON}
 LOW_MEM_USAGE=${LOW_MEM_USAGE:-OFF}
+BUILD_SYCL_MODULE=${BUILD_SYCL_MODULE:-OFF}
 
 # Dependency versions:
 # CUDA: see docker/docker_build.sh
 # ML
-TENSORFLOW_VER="2.13.0"
-TORCH_VER="2.0.1"
-TORCH_CPU_GLNX_VER="${TORCH_VER}+cpu"
-TORCH_CUDA_GLNX_VER="${TORCH_VER}+cu117" # match CUDA_VERSION in docker/docker_build.sh
-TORCH_MACOS_VER="${TORCH_VER}"
+TENSORFLOW_VER="2.16.2"
+TORCH_VER="2.2.2"
 TORCH_REPO_URL="https://download.pytorch.org/whl/torch/"
+TORCH_CXX11_URL="https://download.pytorch.org/whl/"
 # Python
-PIP_VER="23.2.1"
-WHEEL_VER="0.38.4"
-STOOLS_VER="67.3.2"
-YAPF_VER="0.30.0"
+PIP_VER="24.3.1"
 PROTOBUF_VER="4.24.0"
 
 OPEN3D_INSTALL_DIR=~/open3d_install
@@ -45,15 +41,16 @@ install_python_dependencies() {
 
     echo "Installing Python dependencies"
     options="$(echo "$@" | tr ' ' '|')"
-    python -m pip install --upgrade pip=="$PIP_VER" wheel=="$WHEEL_VER" \
-        setuptools=="$STOOLS_VER"
+    python -m pip install -U pip=="$PIP_VER"
+    python -m pip install -U -c "${OPEN3D_SOURCE_ROOT}/python/requirements_build.txt" wheel setuptools
     if [[ "with-unit-test" =~ ^($options)$ ]]; then
-        python -m pip install -U -r python/requirements_test.txt
+        python -m pip install -U -r "${OPEN3D_SOURCE_ROOT}/python/requirements_test.txt"
     fi
     if [[ "with-cuda" =~ ^($options)$ ]]; then
         TF_ARCH_NAME=tensorflow
         TF_ARCH_DISABLE_NAME=tensorflow-cpu
-        TORCH_GLNX="torch==$TORCH_CUDA_GLNX_VER"
+        CUDA_VER=$(nvcc --version | grep "release " | cut -c33-37 | sed 's|[^0-9]||g') # e.g.: 117, 118, 121, ...
+        TORCH_GLNX="torch==${TORCH_VER}+cu${CUDA_VER}"
     else
         # tensorflow-cpu wheels for macOS arm64 are not available
         if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -63,10 +60,9 @@ install_python_dependencies() {
             TF_ARCH_NAME=tensorflow-cpu
             TF_ARCH_DISABLE_NAME=tensorflow
         fi
-        TORCH_GLNX="torch==$TORCH_CPU_GLNX_VER"
+        TORCH_GLNX="torch==${TORCH_VER}+cpu"
     fi
 
-    # TODO: modify other locations to use requirements.txt
     python -m pip install -r "${OPEN3D_SOURCE_ROOT}/python/requirements.txt"
     if [[ "with-jupyter" =~ ^($options)$ ]]; then
         python -m pip install -r "${OPEN3D_SOURCE_ROOT}/python/requirements_jupyter_build.txt"
@@ -79,18 +75,21 @@ install_python_dependencies() {
         python -m pip install -U "$TF_ARCH_NAME"=="$TENSORFLOW_VER" # ML/requirements-tensorflow.txt
     fi
     if [ "$BUILD_PYTORCH_OPS" == "ON" ]; then # ML/requirements-torch.txt
-        if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-            python -m pip install -U "${TORCH_GLNX}" -f "$TORCH_REPO_URL" tensorboard
-
+        if [[ "$OSTYPE" == "linux-gnu"* && "$BUILD_SYCL_MODULE" == "OFF" ]]; then
+            python -m pip install -U "${TORCH_GLNX}" -f "$TORCH_REPO_URL" 
+            python -m pip install tensorboard
+        elif [[ "$OSTYPE" == "linux-gnu"* && "$BUILD_SYCL_MODULE" == "ON" ]]; then
+            python -m pip install -U "${TORCH_GLNX}.cxx11.abi" -i "$TORCH_CXX11_URL"
+            python -m pip install tensorboard
         elif [[ "$OSTYPE" == "darwin"* ]]; then
-            python -m pip install -U torch=="$TORCH_MACOS_VER" -f "$TORCH_REPO_URL" tensorboard
+            python -m pip install -U torch=="$TORCH_VER" -f "$TORCH_REPO_URL" tensorboard
         else
             echo "unknown OS $OSTYPE"
             exit 1
         fi
     fi
     if [ "$BUILD_TENSORFLOW_OPS" == "ON" ] || [ "$BUILD_PYTORCH_OPS" == "ON" ]; then
-        python -m pip install -U yapf=="$YAPF_VER"
+        python -m pip install -U -c "${OPEN3D_SOURCE_ROOT}/python/requirements_build.txt" yapf
         # Fix Protobuf compatibility issue
         # https://stackoverflow.com/a/72493690/1255535
         # https://github.com/protocolbuffers/protobuf/issues/10051
@@ -243,16 +242,16 @@ test_wheel() {
     python -m venv open3d_test.venv
     # shellcheck disable=SC1091
     source open3d_test.venv/bin/activate
-    python -m pip install --upgrade pip=="$PIP_VER" wheel=="$WHEEL_VER" \
-        setuptools=="$STOOLS_VER"
+    python -m pip install -U pip=="$PIP_VER"
+    python -m pip install -U -c "${OPEN3D_SOURCE_ROOT}/python/requirements_build.txt" wheel setuptools
     echo -n "Using python: $(command -v python)"
     python --version
     echo -n "Using pip: "
     python -m pip --version
     echo "Installing Open3D wheel $wheel_path in virtual environment..."
     python -m pip install "$wheel_path"
-    python -c "import open3d; print('Installed:', open3d); print('BUILD_CUDA_MODULE: ', open3d._build_config['BUILD_CUDA_MODULE'])"
-    python -c "import open3d; print('CUDA available: ', open3d.core.cuda.is_available())"
+    python -W default -c "import open3d; print('Installed:', open3d); print('BUILD_CUDA_MODULE: ', open3d._build_config['BUILD_CUDA_MODULE'])"
+    python -W default -c "import open3d; print('CUDA available: ', open3d.core.cuda.is_available())"
     echo
     # echo "Dynamic libraries used:"
     # DLL_PATH=$(dirname $(python -c "import open3d; print(open3d.cpu.pybind.__file__)"))/..
@@ -262,27 +261,23 @@ test_wheel() {
     #     find "$DLL_PATH"/cpu/ -type f -execdir otool -L {} \;
     # fi
     echo
-    # FIXME: Needed because Open3D-ML main TF and PyTorch is older than dev.
-    if [ $BUILD_CUDA_MODULE == ON ]; then
-        install_python_dependencies with-cuda
-    else
-        install_python_dependencies
-    fi
-    if [ "$BUILD_PYTORCH_OPS" == ON ]; then
-        # python -m pip install -r "$OPEN3D_ML_ROOT/requirements-torch.txt"
-        python -c \
+    if python -c "import sys, open3d; sys.exit(not open3d._build_config['BUILD_PYTORCH_OPS'])"; then
+        BUILD_PYTORCH_OPS=ON
+        python -m pip install -r "$OPEN3D_ML_ROOT/requirements-torch.txt"
+        python -W default -c \
             "import open3d.ml.torch; print('PyTorch Ops library loaded:', open3d.ml.torch._loaded)"
     fi
-    if [ "$BUILD_TENSORFLOW_OPS" == ON ]; then
-        # python -m pip install -r "$OPEN3D_ML_ROOT/requirements-tensorflow.txt"
-        python -c \
+    if python -c "import sys, open3d; sys.exit(not open3d._build_config['BUILD_TENSORFLOW_OPS'])"; then
+        BUILD_TENSORFLOW_OPS=ON
+        python -m pip install -r "$OPEN3D_ML_ROOT/requirements-tensorflow.txt"
+        python -W default -c \
             "import open3d.ml.tf.ops; print('TensorFlow Ops library loaded:', open3d.ml.tf.ops)"
     fi
     if [ "$BUILD_TENSORFLOW_OPS" == ON ] && [ "$BUILD_PYTORCH_OPS" == ON ]; then
         echo "Importing TensorFlow and torch in the reversed order"
-        python -c "import tensorflow as tf; import torch; import open3d.ml.torch as o3d"
+        python -W default -c "import tensorflow as tf; import torch; import open3d.ml.torch as o3d"
         echo "Importing TensorFlow and torch in the normal order"
-        python -c "import open3d.ml.torch as o3d; import tensorflow as tf; import torch"
+        python -W default -c "import open3d.ml.torch as o3d; import tensorflow as tf; import torch"
     fi
     deactivate open3d_test.venv # argument prevents unbound variable error
 }
@@ -291,7 +286,7 @@ test_wheel() {
 run_python_tests() {
     # shellcheck disable=SC1091
     source open3d_test.venv/bin/activate
-    python -m pip install -U -r python/requirements_test.txt
+    python -m pip install -U -r "$OPEN3D_SOURCE_ROOT/python/requirements_test.txt"
     echo Add --randomly-seed=SEED to the test command to reproduce test order.
     pytest_args=("$OPEN3D_SOURCE_ROOT"/python/test/)
     if [ "$BUILD_PYTORCH_OPS" == "OFF" ] && [ "$BUILD_TENSORFLOW_OPS" == "OFF" ]; then
@@ -316,11 +311,9 @@ run_cpp_unit_tests() {
 # Need variable OPEN3D_INSTALL_DIR
 test_cpp_example() {
     # Now I am in Open3D/build/
-    cd ..
-    git clone https://github.com/isl-org/open3d-cmake-find-package.git
-    cd open3d-cmake-find-package
+    pushd ../examples/cmake/open3d-cmake-find-package
     mkdir build
-    cd build
+    pushd build
     echo Testing build with cmake
     cmake -DCMAKE_INSTALL_PREFIX=${OPEN3D_INSTALL_DIR} ..
     make -j"$NPROC" VERBOSE=1
@@ -338,41 +331,39 @@ test_cpp_example() {
             ./Draw --skip-for-unit-test
         fi
     fi
-    # Now I am in Open3D/open3d-cmake-find-package/build/
-    cd ../../build
+    popd
+    popd
+    # Now I am in Open3D/build/
 }
 
-# Install dependencies needed for building documentation (on Ubuntu 18.04)
+# Install dependencies needed for building documentation
 # Usage: install_docs_dependencies "${OPEN3D_ML_ROOT}"
 install_docs_dependencies() {
     echo
-    echo Install ubuntu dependencies
-    echo Update cmake needed in Ubuntu 18.04
-    sudo apt-key adv --fetch-keys https://apt.kitware.com/keys/kitware-archive-latest.asc
-    sudo apt-add-repository --yes 'deb https://apt.kitware.com/ubuntu/ bionic main'
-    ./util/install_deps_ubuntu.sh assume-yes
-    sudo apt-get install --yes cmake
-    sudo apt-get install --yes libxml2-dev libxslt-dev python3-dev
-    sudo apt-get install --yes doxygen
-    sudo apt-get install --yes texlive
-    sudo apt-get install --yes texlive-latex-extra
-    sudo apt-get install --yes ghostscript
-    sudo apt-get install --yes pandoc
-    sudo apt-get install --yes ccache
+    echo Install ubuntu dependencies from $(pwd)
+    util/install_deps_ubuntu.sh assume-yes
+    $SUDO apt-get install --yes \
+        libxml2-dev libxslt-dev \
+        python3-dev python-is-python3 python3-pip \
+        doxygen \
+        texlive \
+        texlive-latex-extra \
+        ghostscript \
+        pandoc \
+        ccache
     echo
     echo Install Python dependencies for building docs
     command -v python
     python -V
-    python -m pip install -U -q "wheel==$WHEEL_VER" \
-        "pip==$PIP_VER"
-    python -m pip install -U -q "yapf==$YAPF_VER"
+    python -m pip install -U -q "pip==$PIP_VER"
+    which cmake || python -m pip install -U -q cmake
+    python -m pip install -U -q -r "${OPEN3D_SOURCE_ROOT}/python/requirements_build.txt"
     if [[ -d "$1" ]]; then
         OPEN3D_ML_ROOT="$1"
         echo Installing Open3D-ML dependencies from "${OPEN3D_ML_ROOT}"
         python -m pip install -r "${OPEN3D_ML_ROOT}/requirements.txt"
-        python -m pip install -r "${OPEN3D_ML_ROOT}/requirements-torch.txt"
-        python -m pip install -r "${OPEN3D_ML_ROOT}/requirements-tensorflow.txt" ||
-            python -m pip install tensorflow # FIXME: Remove after Open3D-ML update
+        python -m pip install -r "${OPEN3D_ML_ROOT}/requirements-torch-cxx11-abi.txt"
+        python -m pip install -r "${OPEN3D_ML_ROOT}/requirements-tensorflow.txt"
     else
         echo OPEN3D_ML_ROOT="$OPEN3D_ML_ROOT" not specified or invalid. Skipping ML dependencies.
     fi
@@ -407,9 +398,8 @@ build_docs() {
         "-DWITH_OPENMP=ON"
         "-DBUILD_AZURE_KINECT=ON"
         "-DBUILD_LIBREALSENSE=ON"
-        "-DGLIBCXX_USE_CXX11_ABI=OFF"
-        # TODO: PyTorch still use old CXX ABI, re-enable Tensorflow when PyTorch is updated to use new ABI
-        "-DBUILD_TENSORFLOW_OPS=OFF"
+        "-DGLIBCXX_USE_CXX11_ABI=ON"
+        "-DBUILD_TENSORFLOW_OPS=ON"
         "-DBUILD_PYTORCH_OPS=ON"
         "-DBUILD_EXAMPLES=OFF"
     )

@@ -1,7 +1,7 @@
 // ----------------------------------------------------------------------------
 // -                        Open3D: www.open3d.org                            -
 // ----------------------------------------------------------------------------
-// Copyright (c) 2018-2023 www.open3d.org
+// Copyright (c) 2018-2024 www.open3d.org
 // SPDX-License-Identifier: MIT
 // ----------------------------------------------------------------------------
 
@@ -22,32 +22,10 @@ namespace visualization {
 
 using namespace visualizer;
 
-void pybind_o3dvisualizer(py::module& m) {
+void pybind_o3dvisualizer_declarations(py::module& m) {
     py::class_<O3DVisualizerSelections::SelectedIndex> selected_index(
             m, "SelectedIndex",
             "Information about a point or vertex that was selected");
-    selected_index
-            .def("__repr__",
-                 [](const O3DVisualizerSelections::SelectedIndex& idx) {
-                     std::stringstream s;
-                     s << "{ index: " << idx.index << ", order: " << idx.order
-                       << ", point: (" << idx.point.x() << ", " << idx.point.y()
-                       << ", " << idx.point.z() << ") }";
-                     return s.str();
-                 })
-            .def_readonly("index",
-                          &O3DVisualizerSelections::SelectedIndex::index,
-                          "The index of this point in the point/vertex "
-                          "array")
-            .def_readonly("order",
-                          &O3DVisualizerSelections::SelectedIndex::order,
-                          "A monotonically increasing value that can be "
-                          "used to determine in what order the points "
-                          "were selected")
-            .def_readonly("point",
-                          &O3DVisualizerSelections::SelectedIndex::point,
-                          "The (x, y, z) value of this point");
-
     py::class_<O3DVisualizer, UnownedPointer<O3DVisualizer>, gui::Window>
             o3dvis(m, "O3DVisualizer", "Visualization object used by draw()");
 
@@ -85,6 +63,37 @@ void pybind_o3dvisualizer(py::module& m) {
             o3dvis, "DrawObject",
             "Information about an object that is drawn. Do not modify this, it "
             "can lead to unexpected results.");
+}
+void pybind_o3dvisualizer_definitions(py::module& m) {
+    auto selected_index =
+            static_cast<py::class_<O3DVisualizerSelections::SelectedIndex>>(
+                    m.attr("SelectedIndex"));
+    selected_index
+            .def("__repr__",
+                 [](const O3DVisualizerSelections::SelectedIndex& idx) {
+                     std::stringstream s;
+                     s << "{ index: " << idx.index << ", order: " << idx.order
+                       << ", point: (" << idx.point.x() << ", " << idx.point.y()
+                       << ", " << idx.point.z() << ") }";
+                     return s.str();
+                 })
+            .def_readonly("index",
+                          &O3DVisualizerSelections::SelectedIndex::index,
+                          "The index of this point in the point/vertex "
+                          "array")
+            .def_readonly("order",
+                          &O3DVisualizerSelections::SelectedIndex::order,
+                          "A monotonically increasing value that can be "
+                          "used to determine in what order the points "
+                          "were selected")
+            .def_readonly("point",
+                          &O3DVisualizerSelections::SelectedIndex::point,
+                          "The (x, y, z) value of this point");
+    auto o3dvis =
+            static_cast<py::class_<O3DVisualizer, UnownedPointer<O3DVisualizer>,
+                                   gui::Window>>(m.attr("O3DVisualizer"));
+    auto drawobj = static_cast<py::class_<O3DVisualizer::DrawObject>>(
+            o3dvis.attr("DrawObject"));
     drawobj.def_readonly("name", &O3DVisualizer::DrawObject::name,
                          "The name of the object")
             .def_property_readonly(
@@ -329,8 +338,8 @@ void pybind_o3dvisualizer(py::module& m) {
                  "redraw is required.",
                  "callback"_a)
             .def("export_current_image", &O3DVisualizer::ExportCurrentImage,
-                 "Exports a PNG image of what is currently displayed to the "
-                 "given path.",
+                 "Exports a PNG or JPEG image of what is currently displayed "
+                 "to the given path.",
                  "path"_a)
             .def("start_rpc_interface", &O3DVisualizer::StartRPCInterface,
                  "address"_a, "timeout"_a,
@@ -368,6 +377,9 @@ void pybind_o3dvisualizer(py::module& m) {
                  "Add children (apart from 3D and settings.)")
             .def("show_skybox", &O3DVisualizer::ShowSkybox,
                  "Show/Hide the skybox", "show"_a)
+            .def("set_panel_open", &O3DVisualizer::SetPanelOpen,
+                 "Expand/Collapse verts(panels) within the settings panel",
+                 "name"_a, "open"_a)
             .def_property(
                     "show_settings",
                     [](const O3DVisualizer& dv) {

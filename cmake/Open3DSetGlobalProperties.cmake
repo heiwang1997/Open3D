@@ -25,12 +25,15 @@ function(open3d_enable_strip target)
     endif()
 endfunction()
 
+# RPATH handling (see below). We don't install targets such as pybind, so BUILD_RPATH must be relative as well.
+set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
+
 # open3d_set_global_properties(target)
 #
 # Sets important project-related properties to <target>.
 function(open3d_set_global_properties target)
-    # Tell CMake we want a compiler that supports C++14 features
-    target_compile_features(${target} PUBLIC cxx_std_14)
+    # Tell CMake we want a compiler that supports C++17 features
+    target_compile_features(${target} PUBLIC cxx_std_17)
 
     # Detect compiler id and version for utility::CompilerInfo
     # - OPEN3D_CXX_STANDARD
@@ -118,8 +121,8 @@ function(open3d_set_global_properties target)
     if (USE_BLAS)
         target_compile_definitions(${target} PRIVATE USE_BLAS)
     endif()
-    if (WITH_IPPICV)
-        target_compile_definitions(${target} PRIVATE WITH_IPPICV)
+    if (WITH_IPP)
+        target_compile_definitions(${target} PRIVATE WITH_IPP)
     endif()
     if (GLIBCXX_USE_CXX11_ABI)
         target_compile_definitions(${target} PUBLIC _GLIBCXX_USE_CXX11_ABI=1)
@@ -183,10 +186,6 @@ function(open3d_set_global_properties target)
     target_compile_options(${target} PRIVATE
         $<$<AND:$<CXX_COMPILER_ID:IntelLLVM>,$<NOT:$<COMPILE_LANGUAGE:ISPC>>>:-fno-fast-math>)
 
-    # TBB static version is used
-    # See: https://github.com/wjakob/tbb/commit/615d690c165d68088c32b6756c430261b309b79c
-    target_compile_definitions(${target} PRIVATE __TBB_LIB_NAME=tbb_static)
-
     # Enable strip
     open3d_enable_strip(${target})
 
@@ -194,4 +193,24 @@ function(open3d_set_global_properties target)
     target_compile_options(${target} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${HARDENING_CFLAGS}>")
     target_link_options(${target} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${HARDENING_LDFLAGS}>")
     target_compile_definitions(${target} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${HARDENING_DEFINITIONS}>")
+
+    # RPATH handling. Check current folder, one folder above (cpu/pybind ->
+    # libtbb) and the lib sibling folder (bin/Open3D -> lib/libOpen3D).  Also
+    # check the Python virtual env /lib folder for 3rd party dependency
+    # libraries installed with `pip install`
+    if (APPLE)
+    # Add options to cover the various ways in which open3d shared lib or apps can be installed wrt dependent DSOs
+        set_target_properties(${target} PROPERTIES 
+            INSTALL_RPATH "@loader_path;@loader_path/../;@loader_path/../lib/:@loader_path/../../../../"
+    # pybind with open3d shared lib is copied, not cmake-installed, so we need to add .. to build rpath 
+            BUILD_RPATH "@loader_path;@loader_path/../;@loader_path/../lib/:@loader_path/../../../../")
+    elseif(UNIX)
+        message(STATUS "Setting RPATH for ${target}")
+        # INSTALL_RPATH for C++ binaries.
+        set_target_properties(${target} PROPERTIES 
+            INSTALL_RPATH "$ORIGIN;$ORIGIN/../;$ORIGIN/../lib/;$ORIGIN/../../../../"
+        # BUILD_RPATH for Python wheel libs and app.
+            BUILD_RPATH "$ORIGIN;$ORIGIN/../;$ORIGIN/../lib/;$ORIGIN/../../../../")
+    endif()
+
 endfunction()

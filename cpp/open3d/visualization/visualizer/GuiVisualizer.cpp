@@ -1,7 +1,7 @@
 // ----------------------------------------------------------------------------
 // -                        Open3D: www.open3d.org                            -
 // ----------------------------------------------------------------------------
-// Copyright (c) 2018-2023 www.open3d.org
+// Copyright (c) 2018-2024 www.open3d.org
 // SPDX-License-Identifier: MIT
 // ----------------------------------------------------------------------------
 
@@ -1166,10 +1166,7 @@ void GuiVisualizer::LoadGeometry(const std::string &path) {
                 model_success = false;
             }
         }
-        if (!model_success) {
-            utility::LogInfo("{} appears to be a point cloud", path.c_str());
-        }
-
+        // path appears to be a point cloud...
         auto geometry = std::shared_ptr<geometry::Geometry3D>();
         if (!model_success) {
             auto cloud = std::make_shared<geometry::PointCloud>();
