@@ -252,59 +252,59 @@ private:
     std::function<int(const KeyEvent &)> on_key_;
 };
 
-class PySceneWidget : public SceneWidget {
-    using Super = SceneWidget;
+// class PySceneWidget : public SceneWidget {
+//     using Super = SceneWidget;
 
-public:
-    void SetOnMouse(std::function<int(const MouseEvent &)> f) { on_mouse_ = f; }
-    void SetOnKey(std::function<int(const KeyEvent &)> f) { on_key_ = f; }
+// public:
+//     void SetOnMouse(std::function<int(const MouseEvent &)> f) { on_mouse_ = f; }
+//     void SetOnKey(std::function<int(const KeyEvent &)> f) { on_key_ = f; }
 
-    Widget::EventResult Mouse(const MouseEvent &e) override {
-        if (on_mouse_) {
-            switch (EventCallbackResult(on_mouse_(e))) {
-                case EventCallbackResult::CONSUMED:
-                    return Widget::EventResult::CONSUMED;
-                case EventCallbackResult::HANDLED: {
-                    auto result = Super::Mouse(e);
-                    if (result == Widget::EventResult::IGNORED) {
-                        result = Widget::EventResult::CONSUMED;
-                    }
-                    return result;
-                }
-                case EventCallbackResult::IGNORED:
-                default:
-                    return Super::Mouse(e);
-            }
-        } else {
-            return Super::Mouse(e);
-        }
-    }
+//     Widget::EventResult Mouse(const MouseEvent &e) override {
+//         if (on_mouse_) {
+//             switch (EventCallbackResult(on_mouse_(e))) {
+//                 case EventCallbackResult::CONSUMED:
+//                     return Widget::EventResult::CONSUMED;
+//                 case EventCallbackResult::HANDLED: {
+//                     auto result = Super::Mouse(e);
+//                     if (result == Widget::EventResult::IGNORED) {
+//                         result = Widget::EventResult::CONSUMED;
+//                     }
+//                     return result;
+//                 }
+//                 case EventCallbackResult::IGNORED:
+//                 default:
+//                     return Super::Mouse(e);
+//             }
+//         } else {
+//             return Super::Mouse(e);
+//         }
+//     }
 
-    Widget::EventResult Key(const KeyEvent &e) override {
-        if (on_key_) {
-            switch (EventCallbackResult(on_key_(e))) {
-                case EventCallbackResult::CONSUMED:
-                    return Widget::EventResult::CONSUMED;
-                case EventCallbackResult::HANDLED: {
-                    auto result = Super::Key(e);
-                    if (result == Widget::EventResult::IGNORED) {
-                        result = Widget::EventResult::CONSUMED;
-                    }
-                    return result;
-                }
-                case EventCallbackResult::IGNORED:
-                default:
-                    return Super::Key(e);
-            }
-        } else {
-            return Super::Key(e);
-        }
-    }
+//     Widget::EventResult Key(const KeyEvent &e) override {
+//         if (on_key_) {
+//             switch (EventCallbackResult(on_key_(e))) {
+//                 case EventCallbackResult::CONSUMED:
+//                     return Widget::EventResult::CONSUMED;
+//                 case EventCallbackResult::HANDLED: {
+//                     auto result = Super::Key(e);
+//                     if (result == Widget::EventResult::IGNORED) {
+//                         result = Widget::EventResult::CONSUMED;
+//                     }
+//                     return result;
+//                 }
+//                 case EventCallbackResult::IGNORED:
+//                 default:
+//                     return Super::Key(e);
+//             }
+//         } else {
+//             return Super::Key(e);
+//         }
+//     }
 
-private:
-    std::function<int(const MouseEvent &)> on_mouse_;
-    std::function<int(const KeyEvent &)> on_key_;
-};
+// private:
+//     std::function<int(const MouseEvent &)> on_mouse_;
+//     std::function<int(const KeyEvent &)> on_key_;
+// };
 
 void pybind_gui_declarations(py::module &m) {
     py::module m_gui = m.def_submodule("gui");
@@ -399,6 +399,8 @@ void pybind_gui_declarations(py::module &m) {
             m_gui, "Checkbox", "Checkbox");
     py::class_<ColorEdit, UnownedPointer<ColorEdit>, Widget> coloredit(
             m_gui, "ColorEdit", "Color picker");
+    py::class_<Keyframer, UnownedPointer<Keyframer>, Widget> keyframer(
+            m_gui, "Keyframer", "Keyframe editor");
     py::class_<Combobox, UnownedPointer<Combobox>, Widget> combobox(
             m_gui, "Combobox", "Exclusive selection from a pull-down menu");
     py::class_<RadioButton, UnownedPointer<RadioButton>, Widget> radiobtn(
@@ -1181,8 +1183,9 @@ void pybind_gui_definitions(py::module &m) {
             .def("set_value", &Histogram::SetValue, "Set the histogram values to be used.");
 
     // ---- Keyframer ---
-    py::class_<Keyframer, UnownedPointer<Keyframer>, Widget> keyframer(
-            m, "Keyframer", "A window for specifying animation keyframes");
+    auto keyframer =
+            static_cast<py::class_<Keyframer, UnownedPointer<Keyframer>, Widget>>(
+                    m_gui.attr("Keyframer"));
     keyframer.def(py::init<int, int, int, int, std::string>())
              .def("__repr__",
                   [](const Keyframer &c) {

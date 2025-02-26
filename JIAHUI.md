@@ -9,7 +9,7 @@ I will work on my master branch, and merge with upstream using the following com
 3. Commit the merge.
 4. (Optionally) `git push origin master`
 
-## Compile
+## Compile (deprecated -- please see 'public package' section)
 
 Please follow: http://www.open3d.org/docs/release/compilation.html
 
@@ -24,7 +24,7 @@ make install-pip-package
 
 ## Public Package
 
-To build public package, just run (currently support 38/39/310/311):
+To build public package, just run (currently support 38/39/310/311/312):
 ```bash
 BUILD_TENSORFLOW_OPS=OFF BUILD_PYTORCH_OPS=OFF docker/docker_build.sh cuda_wheel_py310_dev  # will add commit hash
 ```
@@ -44,7 +44,7 @@ python whl_trimmer.py whl_packages/
 # Organize files
 mv whl_packages/open3d_pycg_cpu*.whl ./
 mv whl_packages/out/* ./        # This will just overwrite the original files! Careful.
-rm -rf whl_packages/tmp/
+rm -rf tmp/
 ```
 
 **Making Package Available Online**
