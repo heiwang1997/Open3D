@@ -49,6 +49,14 @@ rm -rf tmp/
 
 **Making Package Available Online**
 
+- Use `twine` to directly upload to PyPI.
+```bash
+# Open the zip file and change xxx.dist-info/METADATA to use metadata version 2.2 instead of 2.1
+twine upload xxxx.whl
+# For API keys you can refer to notion.
+```
+
+- If you still want to use AWS...
 ```bash
 # Move wheels
 mv open3d_pycg_cpu*.whl whl_packages/
@@ -96,3 +104,4 @@ find whl_packages/ -name '*.whl' | while read file; do awsm cp $file s3://pycg/p
 17. Enable selecting model and edit its pose in the new viewer.
 18. Add `set_indirect_light_rotation` binding.
 19. Merge with upstream 0.18.0, change package name to `open3d_pycg`.
+20. Merge with upstream 0.19.0.
